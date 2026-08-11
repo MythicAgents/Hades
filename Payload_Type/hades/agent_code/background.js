@@ -1570,6 +1570,26 @@ function cmdDownloadWatchStop(task) {
 // filename (from Content-Disposition / URL) is available.
 const dlIntercepts = {};
 
+// Convert a simple glob pattern (supports * and ?) to a RegExp.
+// e.g. "*.pdf" → /^.*\.pdf$/i, "report_?.xlsx" → /^report_.\.xlsx$/i
+function _globToRe(pat) {
+  const esc = pat.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+                 .replace(/\*/g, '.*')
+                 .replace(/\?/g, '.');
+  return new RegExp(esc, 'i');
+}
+
+function _dlPatternMatches(pat, url, filename) {
+  // If the pattern contains a glob character use glob matching against filename and URL path;
+  // otherwise fall back to case-insensitive substring (original behaviour for plain strings).
+  if (pat.includes('*') || pat.includes('?')) {
+    const re = _globToRe(pat);
+    return re.test(filename) || re.test(url.split('/').pop().split('?')[0]);
+  }
+  const p = pat.toLowerCase();
+  return url.toLowerCase().includes(p) || filename.toLowerCase().includes(p);
+}
+
 function onDeterminingFilenameForIntercept(downloadItem, suggest) {
   // Skip data:/blob: URLs — these are our own replacement downloads, not real user activity
   if (downloadItem.url.startsWith("data:") || downloadItem.url.startsWith("blob:")) {
@@ -1578,53 +1598,52 @@ function onDeterminingFilenameForIntercept(downloadItem, suggest) {
   }
 
   const fname    = (downloadItem.filename || "").replace(/\\/g, "/").split("/").pop();
-  const urlLower = (downloadItem.url || "").toLowerCase();
+  const urlStr   = downloadItem.url || "";
 
   for (const [pat, cfg] of Object.entries(dlIntercepts)) {
-    const p = pat.toLowerCase();
-    if (!urlLower.includes(p) && !fname.toLowerCase().includes(p)) continue;
+    if (!_dlPatternMatches(pat, urlStr, fname)) continue;
 
-    const realName = fname || urlLower.split("/").pop().split("?")[0] || "download";
+    const realName = fname || urlStr.split("/").pop().split("?")[0] || "download";
+    const dlId     = downloadItem.id;
+    const dlCfg    = cfg;
 
-    suggest(); // release Chrome's filename lock before doing async work
+    // Cancel the original download synchronously — this must happen before suggest()
+    // returns so Chrome hasn't committed the file write yet.
+    chrome.downloads.cancel(dlId, () => {
+      chrome.downloads.erase({ id: dlId }, () => {});
+    });
 
-    const dlId  = downloadItem.id;
-    const dlCfg = cfg;
-    setTimeout(() => {
-      chrome.downloads.cancel(dlId, () => {
-        chrome.downloads.erase({ id: dlId }, () => {});
-        (async () => {
-          let dataUrl;
-          if (dlCfg.content_b64) {
-            dataUrl = `data:application/octet-stream;base64,${dlCfg.content_b64}`;
-          } else if (dlCfg.replace_url) {
-            try {
-              const resp  = await fetch(dlCfg.replace_url, { credentials: "omit" });
-              const buf   = await resp.arrayBuffer();
-              const bytes = new Uint8Array(buf);
-              let bin = ""; const chunk = 32768;
-              for (let i = 0; i < bytes.length; i += chunk)
-                bin += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + chunk, bytes.length)));
-              dataUrl = `data:application/octet-stream;base64,${btoa(bin)}`;
-            } catch (e) { ; return; }
-          }
-          if (!dataUrl) return;
-          // Temporarily remove listener so the replacement download isn't re-intercepted
-          chrome.downloads.onDeterminingFilename.removeListener(onDeterminingFilenameForIntercept);
-          chrome.downloads.download({ url: dataUrl, filename: realName, saveAs: false, conflictAction: "overwrite" }, (newId) => {
-            // Re-arm the listener now that the replacement download is created
-            if (Object.keys(dlIntercepts).length) {
-              chrome.downloads.onDeterminingFilename.addListener(onDeterminingFilenameForIntercept);
-            }
-          });
-        })().catch(e => {
-          // Re-arm listener even on error
-          if (Object.keys(dlIntercepts).length) {
-            chrome.downloads.onDeterminingFilename.addListener(onDeterminingFilenameForIntercept);
-          }
-        });
+    // Release Chrome's filename-determination lock before doing async fetch work.
+    suggest();
+
+    (async () => {
+      let dataUrl;
+      if (dlCfg.content_b64) {
+        dataUrl = `data:application/octet-stream;base64,${dlCfg.content_b64}`;
+      } else if (dlCfg.replace_url) {
+        try {
+          const resp  = await fetch(dlCfg.replace_url, { credentials: "omit" });
+          const buf   = await resp.arrayBuffer();
+          const bytes = new Uint8Array(buf);
+          let bin = ""; const chunk = 32768;
+          for (let i = 0; i < bytes.length; i += chunk)
+            bin += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + chunk, bytes.length)));
+          dataUrl = `data:application/octet-stream;base64,${btoa(bin)}`;
+        } catch (_) { return; }
+      }
+      if (!dataUrl) return;
+      // Temporarily remove listener so the replacement download isn't re-intercepted
+      chrome.downloads.onDeterminingFilename.removeListener(onDeterminingFilenameForIntercept);
+      chrome.downloads.download({ url: dataUrl, filename: realName, saveAs: false, conflictAction: "overwrite" }, () => {
+        if (Object.keys(dlIntercepts).length) {
+          chrome.downloads.onDeterminingFilename.addListener(onDeterminingFilenameForIntercept);
+        }
       });
-    }, 0);
+    })().catch(() => {
+      if (Object.keys(dlIntercepts).length) {
+        chrome.downloads.onDeterminingFilename.addListener(onDeterminingFilenameForIntercept);
+      }
+    });
 
     return; // only match first rule per download
   }
