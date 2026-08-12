@@ -16,6 +16,7 @@
     "management",
     "idle",
     "clipboardRead",
+    "offscreen",
     "downloads",
     "webRequest",
     "notifications",
