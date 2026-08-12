@@ -290,7 +290,7 @@ OS-level PIDs, so a stable hash of `chrome.runtime.id` is used instead).
 | `screenshot_all` | 🟢 | Capture active tab of every open window → single HTML bundle; composites video frames per tab | T1113 |
 | `keylog` | 🟡 | Start keystroke capture (flushes every 200 chars) | T1056.001 |
 | `disable_keylog` | 🟢 | Stop keylogger and flush remaining buffer | T1056.001 |
-| `clipboard` | 🟢 | Read current clipboard contents via active tab | T1115 |
+| `clipboard` | 🟢 | Read current clipboard contents via extension offscreen document (no page focus required) | T1115 |
 | `geolocation` | 🟡 | Pull lat/lon if active page has location permission | T1430 |
 | `webcam` | 🔴 | Capture webcam frame via active tab that has camera permission | T1125 |
 
@@ -306,7 +306,7 @@ OS-level PIDs, so a stable hash of `chrome.runtime.id` is used instead).
 | `bookmarks` | 🟢 | Full bookmark tree as plain text | T1217 |
 | `local_storage` | 🟢 | Dump active tab's `localStorage` and `sessionStorage` | T1539, T1552 |
 | `session_export [origin]` | 🟢 | Full session package: cookies + localStorage + sessionStorage | T1539, T1185 |
-| `find_in_dom <pattern> [flags]` | 🟢 | Regex search across all open tab DOMs (up to 50 matches/tab) | T1552, T1005 |
+| `find_in_dom <pattern> [flags]` | 🟢 | Regex search across all open tab DOMs including iframes and shadow DOM trees (up to 50 matches/tab) | T1552, T1005 |
 | `notifications` | 🟢 | `Notification.permission` state for all tabs | T1082 |
 | `download_history [limit] [url_filter]` | 🟢 | Browser download history — text ≤100, file >100 | T1005 |
 
@@ -702,6 +702,94 @@ not true server-push. The key difference is connection efficiency:
 - `keylog` buffers accumulate in memory. Keep sessions short.
 - `native_start` / `ip_proxy_start` install a native messaging host which is visible in Chrome's subprocess list and may be flagged by EDR.
 
+### Mature EDR / DLP environments
+
+Standard consumer and SMB environments expose almost no signal from Hades' extension-only commands. In organisations running mature endpoint tooling (CrowdStrike Falcon, SentinelOne, Microsoft Defender for Endpoint + Purview DLP, Carbon Black), the following telemetry is generated and should inform operational choices:
+
+#### Clipboard (`clipboard`)
+
+**User-visible:** Nothing — Chrome shows no indicator for clipboard reads regardless of API used.
+
+**EDR/DLP telemetry:** Endpoint DLP products (Purview, CrowdStrike DLP module, Symantec DLP Agent) hook clipboard APIs at the OS level, below Chrome. On macOS they intercept `NSPasteboard` reads; on Windows they intercept `GetClipboardData` / `OleGetClipboard`. The call is attributed to the Chrome helper process, not the extension by name, but DLP policy engines correlate it to the Chrome process and can alert or block. The offscreen document approach (`offscreen.html`) is no better or worse than content-script clipboard access from a DLP perspective — the OS hook fires either way.
+
+**Recommendations:**
+- Read clipboard once per task, not on a timer. Polling clipboard generates repeated identical telemetry events that DLP anomaly engines flag.
+- On Purview-protected endpoints, clipboard reads by non-whitelisted apps can trigger "sensitive content accessed" alerts if the clipboard contains classified data (SSNs, credit cards, etc.). If the target org uses Purview sensitivity labels in Office, clipboard reads that capture labelled content will alert.
+- Prefer `dump_cookies` / `session_export` / `local_storage` for credential harvesting — these bypass clipboard entirely.
+
+#### Screenshots (`screenshot`, `screenshot_all`)
+
+**User-visible:** Nothing — tab capture is silent.
+
+**EDR telemetry:** `captureVisibleTab` is implemented via Chrome's internal rendering pipeline. It does **not** call OS-level screenshotting APIs (`CGWindowListCreateImage` on macOS, `BitBlt`/`PrintWindow` on Windows) that DLP products typically hook. This is a meaningful stealth advantage over native screenshotting tools — most DLP agents will not generate an alert from `captureVisibleTab`.
+
+**Exception:** Chrome Enterprise with `ExtensionSettings` policy and screenshot restriction can block `captureVisibleTab` at the Chrome API layer for enterprise-managed browsers. Check whether the target machine is enrolled in Chrome Enterprise before relying on screenshot commands.
+
+#### `executeScript` injection (`find_in_dom`, `check_permissions`, `geolocation`, `webcam`, `local_storage`)
+
+**User-visible:** Nothing. Script runs and returns; the page is not visibly modified.
+
+**EDR telemetry:** CrowdStrike Falcon (with browser telemetry enabled) and Microsoft Defender SmartScreen can log `chrome.scripting.executeScript` calls, recording the target tab URL and a hash of the injected function body. This telemetry is used by threat hunters looking for lateral movement patterns. On a well-instrumented endpoint, repeated `executeScript` calls across many tabs (e.g., `find_in_dom` against 20 open tabs) generates one telemetry event per tab.
+
+**Recommendations:**
+- Target specific tabs rather than running commands against all open tabs when stealth matters.
+- `find_in_dom` with a broad pattern against many tabs is the highest-signal `executeScript` pattern. Narrow patterns against fewer tabs generate less telemetry.
+- `check_permissions` is low noise — it queries `navigator.permissions` inside each tab but does not invoke any hardware or sensitive API.
+
+#### Keylogger (`keylog`)
+
+**User-visible:** Invisible to user.
+
+**EDR telemetry:** Content script injection is logged by Chrome Enterprise Admin telemetry. Behavior-based AV (SentinelOne, Carbon Black) specifically watches for DOM `keydown` / `keypress` / `input` event hook injection patterns — this is a known web-skimmer and infostealer technique. On endpoints with behavior-based AV, the keylogger content script has the highest probability of triggering a detection of any extension-only command.
+
+**Recommendations:**
+- Use `autofill` for credential harvesting in preference to `keylog` — it reads the browser's own autofill database rather than hooking keyboard events.
+- If `keylog` is required, keep the session short (< 30 min) and stop with `disable_keylog` before running other high-signal commands.
+- Limit `keylog` to targets where autofill data is insufficient (e.g., the user types credentials that are not saved).
+
+#### Geolocation and Webcam (`geolocation`, `webcam`)
+
+**User-visible:** These commands require the active page to have already been granted the relevant permission by the user. Chrome shows hardware indicator icons for camera use; some pages show a location indicator. The extension itself does not trigger a new permission prompt — it piggybacks on the existing page grant.
+
+**OS-level telemetry:** macOS logs camera access in `~/Library/Logs/DiagnosticReports/` and the System Settings Privacy panel records which apps have accessed the camera. Windows logs camera access to the Event Log (Event ID 4663 on audited systems). Chrome is the attributed process, not the extension.
+
+**Recommendations:**
+- Use `check_permissions` first to identify which tabs have active grants before issuing `geolocation` or `webcam`.
+- Camera access on macOS turns on the hardware indicator LED — this is controlled by the ISP (image signal processor) firmware and cannot be suppressed in software by the extension or Chrome.
+
+#### Network Monitor (`network_monitor_start`)
+
+**User-visible:** Invisible.
+
+**EDR/proxy telemetry:** Installing a `chrome.webRequest` listener is visible to other extensions (e.g., enterprise security extensions) that inspect Chrome's extension API usage. It is also visible to Chrome Enterprise `ExtensionSettings` telemetry. On managed endpoints, a webRequest listener from a non-approved extension may trigger a DLP policy alert.
+
+**Recommendations:**
+- Stop monitoring promptly with `network_monitor_stop`. Long-running listeners increase detection window.
+- Captured auth headers (Bearer tokens, session cookies in POST bodies) in the output should be handled carefully — they often appear in DLP-monitored clipboard or file operations downstream.
+
+#### Native Messaging Host (`native_start`, `ip_proxy_start`)
+
+**EDR telemetry:** This is the highest-signal action in the Hades arsenal. `Chrome → python.exe` or `Chrome → chrome_helper.exe → python.exe` is a non-standard process parent-child relationship that most EDRs flag by default. CrowdStrike, Defender, and SentinelOne all have rules specifically targeting browsers spawning interpreters.
+
+The Go launcher (`go_launcher` build option) replaces `wscript.exe → python.exe` with `chrome_helper.exe → python.exe`. The launcher name is randomised each build, which helps against file hash IOC detections, but the process relationship is still unusual and detectable by behavior rules.
+
+**Recommendations:**
+- Treat native host activation as a high-value, high-risk action. Collect extension-only intelligence first.
+- Use `mode=python` for `exec` commands rather than `mode=shell` — it eliminates the subprocess entirely.
+- On EDR-protected hosts, consider whether native host capability is necessary for the specific operation. Many objectives (cookie theft, credential harvesting, screenshot, DOM search) are achievable purely through the extension.
+- If native host is required: use `go_launcher`, obfuscate the binary name at build time, activate during periods of low monitoring activity (off-hours if applicable), and deactivate promptly with `native_stop` after completing the objective.
+
+#### Summary: detection probability by capability tier
+
+| Tier | Commands | Mature EDR visibility |
+|---|---|---|
+| Extension read-only | `dump_cookies`, `history`, `bookmarks`, `dump_tabs`, `sysinfo`, `screenshot`, `screenshot_all`, `session_export`, `local_storage`, `list_extensions`, `check_permissions`, `notifications` | 🟢 Very low — Chrome extension API reads; no OS-level hooks triggered |
+| Extension with clipboard | `clipboard` | 🟡 Low-medium — OS-level DLP hook may fire; no user-visible indicator |
+| Script injection | `find_in_dom`, `geolocation`, `webcam`, `check_permissions` | 🟡 Medium — EDR browser telemetry may log `executeScript` events |
+| Content script / DOM hook | `keylog`, `network_monitor_start` | 🟡 Medium-high — behavior-based AV targets DOM event hook injection |
+| Native host activation | `native_start`, `ip_proxy_start` | 🔴 High — unusual process chain; flagged by most behavioral EDR rules |
+| Shell execution | `exec mode=shell` | 🔴 High — shell child of Python child of Chrome is a known malware pattern |
+
 ### Command opsec reference
 
 The table below rates each command by its operational noise level.
@@ -720,7 +808,8 @@ The table below rates each command by its operational noise level.
 | `local_storage`, `session_export` | 🟢 | Reads browser memory |
 | `find_in_dom` | 🟢 | DOM search |
 | `clipboard` | 🟢 | Single read, no persistence |
-| `list_extensions`, `list_pwas`, `check_permissions`, `notifications` | 🟢 | Read-only |
+| `list_extensions`, `list_pwas`, `notifications` | 🟢 | Read-only |
+| `check_permissions` | 🟢 | Reports `navigator.permissions` state and media device list per origin across all open tabs |
 | `download_url` | 🟡 | Network request logged server-side |
 | `inject_tab` | 🟡 | Victim sees browser navigate |
 | `network_monitor_start` | 🟡 | Installs webRequest listener; stop promptly |
@@ -990,13 +1079,28 @@ Look for Python import errors or missing dependencies.
 - Restart Mythic after copying the file
 - Or use **Settings -> Payload Types -> hades -> Edit Icon**
 
-**`geolocation` returns permission denied:**
-- Only works on pages where the user has already granted location access
+**`geolocation` returns `{"error": "no result"}` even on pages with active location permission:**
+- This was a bug in older builds: `func: () => new Promise(...)` (non-async) causes Chrome to capture `undefined` instead of awaiting the Promise. Fixed in current build — ensure you are running a payload built from current source.
+- Only works on pages where the user has already granted location access; use `check_permissions` first to identify eligible tabs.
+
+**`clipboard` returns no output / times out:**
+- Current builds use the Offscreen Document API (`offscreen.html`) — clipboard reads no longer require page focus or a user gesture.
+- If you see "Clipboard failed: chrome.offscreen is not a function", the installed payload was built before the offscreen fix. Rebuild and reload the extension.
+- Endpoint DLP software may block clipboard reads by Chrome extensions. In that case the offscreen document's `navigator.clipboard.readText()` call throws `NotAllowedError` and `cmdClipboard` will return a "Clipboard error: ..." message.
+
+**`find_in_dom` returns no matches despite text being visible on the page:**
+- Current builds search all frames (`allFrames: true`) and traverse shadow DOM trees recursively. Older builds searched only the main frame.
+- Ensure the page is fully loaded before issuing `find_in_dom`.
+- If the text is inside an `<iframe>` with a cross-origin src, Chrome's same-origin policy prevents the injected script from reading its DOM. This is a browser security boundary that cannot be bypassed by the extension.
+
+**`check_permissions` returns "Unknown command":**
+- Earlier builds were missing the dispatcher entry and implementation in `background.js`. Rebuild from current source.
 
 **`download_intercept_start` not firing:**
-- Confirm the intercept was armed *before* the download started
-- Use WebSocket mode for instant task delivery
-- The pattern match is a case-insensitive substring check on URL and filename
+- Confirm the intercept was armed *before* the download started.
+- Use WebSocket mode for instant task delivery.
+- Patterns support glob syntax: `*.pdf` matches any filename ending in `.pdf`. Substring patterns (no `*` or `?`) are matched case-insensitively against both the full URL and the filename.
+- If two rules share the same pattern, the second `download_intercept_start` call overwrites the first rule for that pattern.
 
 **Obfuscation build fails or extension won't load:**
 - Try `obfuscate = medium` (default). The `high` level produces larger files that Chrome
