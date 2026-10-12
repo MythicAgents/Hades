@@ -200,8 +200,14 @@ Add one or both transport profiles:
 |---|---|
 | `callback_host` | Your Mythic server IP or domain |
 | `callback_port` | `80` or `443` |
-| `ENDPOINT_REPLACE` | `/` |
+| `post_uri` | `/` (or the HTTP profile URI, e.g. `/prod/agent`) |
 | `encrypted_exchange_check` | `true` or `false` (must match the websocket setting) |
+
+> The Mythic **http** profile uses `post_uri` (websocket uses `ENDPOINT_REPLACE`). The builder
+> bakes `post_uri` into `HTTP_C2_URL` when `ENDPOINT_REPLACE` is empty. HTTP POSTs the raw
+> `aes256_hmac` blob as `text/plain`, not the websocket JSON envelope. File commands register,
+> then send chunks. `is_screenshot` files appear under Search Files and Screenshots; other loot
+> is Search Files only. The task-row download control saves stdout, not the attached file.
 
 > **Enabling EKE (RSA key exchange):** The `encrypted_exchange_check` setting must be
 > `true` on the **C2 profile instance** *before* building. Mythic generates the RSA key

@@ -37,7 +37,8 @@ class DownloadUrlCommand(CommandBase):
     help_cmd       = "download_url <url>"
     description    = (
         "Fetch a URL using the browser's existing session cookies and return the "
-        "response as a downloadable file. Useful for grabbing authenticated API "
+        "response as a downloadable file. Cookies are attached to the request via "
+        "declarativeNetRequest (no tab). Useful for grabbing authenticated API "
         "responses, internal documents, or protected resources."
     )
     version        = 1

